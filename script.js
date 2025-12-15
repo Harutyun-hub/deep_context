@@ -399,7 +399,7 @@ async function loadConversation(conversationId) {
     const messagesContainer = document.getElementById('messages');
     
     try {
-        messagesContainer.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="loading-spinner"></div></div>';
+        messagesContainer.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="loading-spinner"><img src="attached_assets/nundu_ai_logo_1765627158270.png" alt="Loading"></div></div>';
         
         currentConversationId = conversationId;
         const conversation = await getConversation(conversationId);
