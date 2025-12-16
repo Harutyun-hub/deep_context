@@ -389,8 +389,6 @@ async function getAIResponse(userMessage, sessionId, userId) {
             companyKey: selectedCompany || null
         };
         
-        console.log('Sending request with body:', requestBody);
-        
         const response = await fetch('https://wimedia.app.n8n.cloud/webhook/chat', {
             method: 'POST',
             headers: {
@@ -405,15 +403,12 @@ async function getAIResponse(userMessage, sessionId, userId) {
         
         const text = await response.text();
         
-        console.log('Raw response text:', text);
-        
         if (!text || text.trim() === '') {
             console.warn('Empty response from webhook');
             throw new Error('Empty response from server');
         }
         
         const data = JSON.parse(text);
-        console.log('Parsed response data:', data);
         
         if (data.output) {
             return data.output;
@@ -470,24 +465,32 @@ async function handleSendMessage() {
             typingMessage.remove();
             addMessageToUI('ai', aiResponse, false, true);
             
-            saveMessage('ai', aiResponse).catch(error => {
-                console.error('Failed to save AI response:', error);
-            });
+            const convIdAtSend = currentConversationId;
+            const titleForConv = userMessage.length > 50 ? userMessage.substring(0, 50) + '...' : userMessage;
             
-            getMessageCount(currentConversationId).then(messageCount => {
-                if (messageCount === 2) {
-                    const title = userMessage.length > 50 ? userMessage.substring(0, 50) + '...' : userMessage;
-                    updateConversationTitle(currentConversationId, title).then(() => {
-                        loadConversationHistory().catch(error => {
-                            console.error('Failed to load conversation history:', error);
-                        });
-                    }).catch(error => {
-                        console.error('Failed to update conversation title:', error);
-                    });
-                }
-            }).catch(error => {
-                console.error('Failed to get message count:', error);
-            });
+            saveMessage('ai', aiResponse)
+                .then(() => {
+                    if (convIdAtSend !== currentConversationId) return;
+                    
+                    return getMessageCount(convIdAtSend);
+                })
+                .then(messageCount => {
+                    if (!messageCount || convIdAtSend !== currentConversationId) return;
+                    
+                    if (messageCount === 2) {
+                        updateConversationTitle(convIdAtSend, titleForConv)
+                            .then(() => {
+                                const updated = updateSidebarTitleLocally(convIdAtSend, titleForConv);
+                                if (!updated) {
+                                    loadConversationHistory().catch(() => {});
+                                }
+                            })
+                            .catch(() => {});
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to save AI response:', error);
+                });
             
         } catch (error) {
             typingMessage.remove();
@@ -520,7 +523,6 @@ async function createNewConversation() {
         currentSessionId = generateUUID();
         const conversation = await createConversation(user.id, null, currentSessionId);
         currentConversationId = conversation.id;
-        console.log('New conversation created:', conversation.id);
         return conversation;
     } catch (error) {
         console.error('Error creating conversation:', error);
@@ -552,7 +554,6 @@ async function loadConversation(conversationId) {
             });
         }
         
-        console.log('Conversation loaded:', conversationId);
     } catch (error) {
         console.error('Error loading conversation:', error);
         messagesContainer.innerHTML = '<div class="error-message">Failed to load conversation. Please try again.</div>';
@@ -562,7 +563,7 @@ async function loadConversation(conversationId) {
 
 async function loadConversationHistory() {
     const user = getCurrentUser();
-    if (!user) return;
+    if (!user) return [];
     
     const historyContainer = document.getElementById('chatHistory');
     
@@ -574,7 +575,7 @@ async function loadConversationHistory() {
         
         if (conversations.length === 0) {
             historyContainer.innerHTML = '<div style="padding: 16px; text-align: center; color: #9aa0a6; font-size: 13px;">No conversations yet</div>';
-            return;
+            return [];
         }
         
         conversations.forEach(conv => {
@@ -656,10 +657,34 @@ async function loadConversationHistory() {
             document.addEventListener('click', closeAllChatDropdowns);
             chatDropdownListenerAttached = true;
         }
+        
+        return conversations;
     } catch (error) {
         console.error('Error loading conversation history:', error);
         historyContainer.innerHTML = '<div class="error-message" style="margin: 10px; font-size: 12px;">Failed to load history</div>';
+        return [];
     }
+}
+
+function updateSidebarTitleLocally(conversationId, newTitle) {
+    const historyContainer = document.getElementById('chatHistory');
+    if (!historyContainer) return false;
+    
+    const chatItems = historyContainer.querySelectorAll('.chat-item');
+    for (const chatItem of chatItems) {
+        const textSpan = chatItem.querySelector('.chat-item-text');
+        if (textSpan) {
+            const clickHandler = textSpan.onclick || (() => {});
+            const itemId = chatItem.dataset?.conversationId;
+            
+            if (chatItem.classList.contains('active') || 
+                (currentConversationId && conversationId === currentConversationId)) {
+                textSpan.textContent = newTitle;
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 async function handleRenameConversation(conversationId, currentTitle) {
@@ -733,7 +758,6 @@ function hideWelcomeMessage() {
 
 async function handleNewChatClick(e) {
     e.preventDefault();
-    console.log('New chat button clicked');
     try {
         const messagesContainer = document.getElementById('messages');
         messagesContainer.innerHTML = '';
@@ -789,7 +813,6 @@ async function populateChatCompanyFilter() {
             companyFilter.value = currentValue;
         }
         
-        console.log('✓ Chat company filter populated');
     } catch (error) {
         console.error('Error populating chat company filter:', error);
     }
@@ -797,7 +820,6 @@ async function populateChatCompanyFilter() {
 
 async function initializeChat() {
     if (isInitialized) {
-        console.log('Chat already initialized, skipping');
         return;
     }
     
@@ -807,25 +829,15 @@ async function initializeChat() {
         return;
     }
     
-    console.log('Initializing chat for user:', user.id);
     
     try {
-        console.log('Populating company filter...');
         await populateChatCompanyFilter();
         
-        console.log('Loading conversation history...');
-        await loadConversationHistory();
-        console.log('Conversation history loaded');
-        
-        console.log('Getting user conversations...');
-        const conversations = await getUserConversations(user.id, 1);
-        console.log(`Found ${conversations.length} conversations`);
+        const conversations = await loadConversationHistory();
         
         if (conversations.length > 0) {
-            console.log('Loading first conversation...');
             await loadConversation(conversations[0].id);
         } else {
-            console.log('Creating new conversation...');
             await createNewConversation();
             showWelcomeMessage();
         }
@@ -838,22 +850,18 @@ async function initializeChat() {
     const messageInput = document.getElementById('messageInput');
     messageInput.removeEventListener('keypress', handleEnterKey);
     messageInput.addEventListener('keypress', handleEnterKey);
-    console.log('✓ Enter key listener attached');
     
     const sendBtn = document.getElementById('sendBtn');
     sendBtn.removeEventListener('click', handleSendMessage);
     sendBtn.addEventListener('click', handleSendMessage);
-    console.log('✓ Send button listener attached');
     
     const newChatBtn = document.querySelector('.new-chat-btn');
     if (newChatBtn) {
         newChatBtn.removeEventListener('click', handleNewChatClick);
         newChatBtn.addEventListener('click', handleNewChatClick);
-        console.log('✓ New chat button listener attached');
     } else {
         console.error('New chat button not found');
     }
     
     isInitialized = true;
-    console.log('✓ Chat initialization complete');
 }

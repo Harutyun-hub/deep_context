@@ -17,8 +17,6 @@ async function initAuth() {
     }
     
     supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log('Auth state changed:', event);
-        
         if (event === 'SIGNED_IN' && session) {
             currentUser = session.user;
             await ensureUserExists(session.user);
@@ -52,8 +50,6 @@ async function ensureUserExists(user) {
         
         if (insertError) {
             console.error('Error creating user:', insertError);
-        } else {
-            console.log('User created successfully');
         }
     }
 }

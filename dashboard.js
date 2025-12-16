@@ -48,46 +48,32 @@ const tableConfigs = {
 };
 
 async function initDashboard() {
-    console.log('=== Dashboard initialization started ===');
     try {
-        console.log('Initializing Supabase...');
         supabase = await initSupabase();
         
         if (!supabase) {
-            console.error('Failed to initialize Supabase');
             showToast('Failed to initialize database connection', 'error');
             return;
         }
-        console.log('Supabase initialized successfully');
         
-        console.log('Initializing auth...');
         const session = await initAuth();
         
         if (!session && !window.location.pathname.includes('login.html')) {
-            console.log('No session, redirecting to login');
             window.location.href = '/login.html';
             return;
         }
-        console.log('Auth session:', session ? 'exists' : 'none');
         
         currentUser = getCurrentUser();
         
         if (!currentUser) {
-            console.log('No current user, redirecting to login');
             window.location.href = '/login.html';
             return;
         }
-        console.log('Current user:', currentUser.email);
         
-        console.log('Updating user profile...');
         updateUserProfile();
-        console.log('Populating company filter...');
         await populateCompanyFilter();
-        console.log('Setting up event listeners...');
         setupEventListeners();
-        console.log('Loading all data...');
         await loadAllData();
-        console.log('=== Dashboard initialization complete ===');
         
     } catch (error) {
         console.error('Error initializing dashboard:', error);
@@ -96,7 +82,6 @@ async function initDashboard() {
 }
 
 function updateUserProfile() {
-    console.log('User profile updated for:', currentUser?.email);
 }
 
 function setupEventListeners() {
@@ -107,6 +92,8 @@ function setupEventListeners() {
     const dateTo = document.getElementById('dateTo');
     const companyFilter = document.getElementById('companyFilter');
     const sourceFilter = document.getElementById('sourceFilter');
+    
+    const debouncedLoadAllData = debounce(() => loadAllData(), 300);
     
     if (refreshBtn) {
         refreshBtn.addEventListener('click', async () => {
@@ -127,7 +114,7 @@ function setupEventListeners() {
     
     [dateFrom, dateTo, companyFilter, sourceFilter].forEach(el => {
         if (el) {
-            el.addEventListener('change', () => loadAllData());
+            el.addEventListener('change', debouncedLoadAllData);
         }
     });
     
@@ -151,10 +138,7 @@ function setupSectionToggles() {
 }
 
 async function loadAllData() {
-    console.log('loadAllData called');
-    
     const filters = getFilters();
-    console.log('Filters:', filters);
     
     try {
         await Promise.all([
@@ -162,7 +146,6 @@ async function loadAllData() {
             loadGoogleAds(filters),
             loadInstagramPosts(filters)
         ]);
-        console.log('All data loaded successfully');
     } catch (error) {
         console.error('Error in loadAllData:', error);
     }
@@ -178,15 +161,12 @@ function getFilters() {
 }
 
 async function loadFacebookAds(filters) {
-    console.log('loadFacebookAds called with filters:', filters);
     if (filters.source && filters.source !== 'facebook') {
-        console.log('Skipping Facebook Ads (source filter)');
         updateTableUI('facebook', []);
         return;
     }
     
     try {
-        console.log('Querying Facebook Ads...');
         let query;
         
         if (filters.company) {
@@ -210,8 +190,6 @@ async function loadFacebookAds(filters) {
         
         const { data, error } = await query.order('start_date_string', { ascending: false });
         
-        console.log('Facebook Ads query result:', { dataCount: data?.length, error });
-        
         if (error) {
             console.error('Error loading Facebook Ads:', error);
             showToast('Error loading Facebook Ads data', 'error');
@@ -227,19 +205,15 @@ async function loadFacebookAds(filters) {
 }
 
 async function loadGoogleAds(filters) {
-    console.log('loadGoogleAds called with filters:', filters);
     if (filters.source && filters.source !== 'google') {
-        console.log('Skipping Google Ads (source filter)');
         updateTableUI('google', []);
         return;
     }
     
     try {
-        console.log('Querying Google Ads...');
         let query;
         
         if (filters.company) {
-            console.log('Applying company filter:', filters.company);
             query = supabase
                 .from('google_ads')
                 .select('*, companies!inner(company_key)')
@@ -251,18 +225,14 @@ async function loadGoogleAds(filters) {
         }
         
         if (filters.dateFrom) {
-            console.log('Applying dateFrom filter:', filters.dateFrom);
             query = query.gte('first_show', filters.dateFrom);
         }
         
         if (filters.dateTo) {
-            console.log('Applying dateTo filter:', filters.dateTo);
             query = query.lte('first_show', filters.dateTo);
         }
         
         const { data, error } = await query.order('first_show', { ascending: false });
-        
-        console.log('Google Ads query result:', { dataCount: data?.length, error });
         
         if (error) {
             console.error('Error loading Google Ads:', error);
@@ -279,20 +249,16 @@ async function loadGoogleAds(filters) {
 }
 
 async function loadInstagramPosts(filters) {
-    console.log('loadInstagramPosts called with filters:', filters);
     if (filters.source && filters.source !== 'instagram') {
-        console.log('Skipping Instagram Posts (source filter)');
         updateTableUI('instagram', []);
         updateInstagramChart([]);
         return;
     }
     
     try {
-        console.log('Querying Instagram Posts...');
         let query;
         
         if (filters.company) {
-            console.log('Applying company filter:', filters.company);
             query = supabase
                 .from('instagram_posts')
                 .select('*, companies!inner(company_key)')
@@ -312,8 +278,6 @@ async function loadInstagramPosts(filters) {
         }
         
         const { data, error } = await query.order('created_at', { ascending: false });
-        
-        console.log('Instagram Posts query result:', { dataCount: data?.length, error });
         
         if (error) {
             console.error('Error loading Instagram Posts:', error);
@@ -459,7 +423,6 @@ function updateInstagramChart(data) {
                     }
                 }
             });
-            console.log('✓ Instagram bar chart created');
         } catch (error) {
             console.error('Error creating Instagram bar chart:', error);
         }
@@ -516,7 +479,6 @@ function updateInstagramChart(data) {
                     }
                 }
             });
-            console.log('✓ Instagram doughnut chart created');
         } catch (error) {
             console.error('Error creating Instagram doughnut chart:', error);
         }

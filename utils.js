@@ -95,3 +95,16 @@ async function retryOperation(operation, maxRetries = 3, delay = 1000) {
         }
     }
 }
+
+function debounce(func, wait = 300) {
+    let timeoutId = null;
+    return function(...args) {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        timeoutId = setTimeout(() => {
+            func.apply(this, args);
+            timeoutId = null;
+        }, wait);
+    };
+}

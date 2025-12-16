@@ -123,6 +123,8 @@ function setupEventListeners() {
     const companyFilter = document.getElementById('companyFilter');
     const compareCompanyFilter = document.getElementById('compareCompanyFilter');
     
+    const debouncedLoadAllData = debounce(() => loadAllData(), 300);
+    
     if (refreshBtn) {
         refreshBtn.addEventListener('click', async () => {
             await loadAllData();
@@ -142,7 +144,7 @@ function setupEventListeners() {
     
     [dateFrom, dateTo, companyFilter, compareCompanyFilter].forEach(el => {
         if (el) {
-            el.addEventListener('change', () => loadAllData());
+            el.addEventListener('change', debouncedLoadAllData);
         }
     });
 }

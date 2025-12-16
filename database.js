@@ -16,7 +16,6 @@ async function createConversation(userId, title = null, sessionId = null) {
         throw error;
     }
     
-    console.log('Conversation created:', data);
     return data;
 }
 
@@ -86,7 +85,6 @@ async function deleteConversation(conversationId) {
         throw error;
     }
     
-    console.log('Conversation deleted:', conversationId);
 }
 
 async function saveMessageToSupabase(conversationId, userId, role, content) {
@@ -113,10 +111,12 @@ async function saveMessageToSupabase(conversationId, userId, role, content) {
         throw error;
     }
     
-    await supabase
+    supabase
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })
-        .eq('id', conversationId);
+        .eq('id', conversationId)
+        .then(() => {})
+        .catch(err => console.error('Error updating conversation timestamp:', err));
     
     return data;
 }
@@ -168,7 +168,6 @@ async function deleteAllUserConversations(userId) {
         throw error;
     }
     
-    console.log('All conversations deleted for user:', userId);
 }
 
 async function getMessageCount(conversationId) {
