@@ -69,11 +69,18 @@ The application is built with vanilla HTML, CSS, and JavaScript.
 - **Event Handling**: Robust event listener management using named functions to prevent duplicates and ensure consistency.
 - **Performance Optimizations**:
     - 300ms debouncing on dashboard and intelligence filter changes to reduce redundant database queries
+    - 300ms debouncing on chat switching to prevent rapid click conflicts
     - Single conversation fetch during chat initialization (eliminated duplicate calls)
     - Local DOM manipulation for sidebar title updates with fallback reload
     - Non-blocking asynchronous timestamp updates
     - Parallelized post-response database operations with conversation ID guards to prevent race conditions
     - Production-clean codebase with debug logging removed (error logging retained)
+- **Robust Message Saving**:
+    - Messages capture conversation/user IDs at send time, ensuring saves complete to correct conversation even when switching chats
+    - Background task tracking with `trackBackgroundTask()` for pending saves
+    - Browser beforeunload warning when background work is in progress
+    - Loading lock prevents duplicate conversation loads during async operations
+    - Failed conversation loads allow immediate retry without navigating away
 - **Server**: Python HTTP server providing a `/api/config` endpoint for secure credential delivery (Supabase anon key).
 - **Competitive Intelligence Suite**: `dashboard.html` with `intelligence.js` and `intelligence.css` for 4-pillar competitive analysis:
   - Data loading functions use `getCompanyIdsFromFilters()` helper for client-vs-competitor comparison
