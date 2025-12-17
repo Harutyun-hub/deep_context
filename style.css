@@ -588,27 +588,14 @@ body {
 .header-info {
     display: flex;
     flex-direction: column;
+    justify-content: center;
 }
 
 .header-title {
-    font-size: 16px;
-    font-weight: 500;
+    font-size: 18px;
+    font-weight: 600;
     color: var(--color-gray-800);
-}
-
-.status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: var(--color-gray-500);
-}
-
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: var(--color-green-500);
+    line-height: 1.2;
 }
 
 .header-right {
