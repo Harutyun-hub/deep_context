@@ -1,22 +1,22 @@
 let currentUser = null;
-let supabase = null;
+let authSupabase = null;
 
 async function initAuth() {
-    supabase = await initSupabase();
+    authSupabase = await initSupabase();
     
-    if (!supabase) {
+    if (!authSupabase) {
         console.error('Failed to initialize Supabase');
         return null;
     }
     
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await authSupabase.auth.getSession();
     
     if (session) {
         currentUser = session.user;
         await ensureUserExists(session.user);
     }
     
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    authSupabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
             currentUser = session.user;
             await ensureUserExists(session.user);
@@ -31,14 +31,14 @@ async function initAuth() {
 async function ensureUserExists(user) {
     if (!user) return;
     
-    const { data: existingUser, error: fetchError } = await supabase
+    const { data: existingUser, error: fetchError } = await authSupabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single();
     
     if (!existingUser) {
-        const { error: insertError } = await supabase
+        const { error: insertError } = await authSupabase
             .from('users')
             .insert([{
                 id: user.id,
@@ -56,15 +56,15 @@ async function ensureUserExists(user) {
 
 async function signInWithGoogle() {
     try {
-        if (!supabase) {
+        if (!authSupabase) {
             await initAuth();
         }
         
-        if (!supabase) {
+        if (!authSupabase) {
             throw new Error('Authentication service not available');
         }
         
-        const { data, error } = await supabase.auth.signInWithOAuth({
+        const { data, error } = await authSupabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
                 redirectTo: window.location.origin + '/index.html'
@@ -87,7 +87,7 @@ async function signInWithGoogle() {
 }
 
 async function signOut() {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await authSupabase.auth.signOut();
     
     if (error) {
         console.error('Error signing out:', error);
