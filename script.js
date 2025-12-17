@@ -5,12 +5,55 @@ let chatDropdownListenerAttached = false;
 let isLoadingConversation = false;
 let pendingBackgroundTasks = 0;
 
+const SAVE_TIMEOUT_MS = 30000;
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1000;
+
 const NIMBUS_AVATAR_BASE64 = 'data:image/webp;base64,UklGRmACAABXRUJQVlA4WAoAAAAQAAAALwAAJwAAQUxQSDoBAAABkEPbtqk957dt27Zt26j+zlaH1oxt2zY727ad7PCNcU9YRsQE0F+7WVGKAauQg+9edzGSLbuGs3u3KbHR6H4BXDkxzMZ60Wec7AyyVSKmYYeBza7EVq7yBt6NGhJbzd6XeFCnSGytF3/GqVTiG3oY2OxObOUqruPduAHxVKyK1+55iYcNSsQ0+cW93R9xLoO4au8A8GmbF3G1nvwRwC1v4qhp5ewTvQU/bGGgUbbn2t3Hrz5/9+FkqTDlzC3v8POtRcYk2nrxa/z8zUoTEm6+CVJna5Bw03WQ+iaNhGsvgeTjesIU+iC9h4TXvJV20ElY9n1I/TjPikR7Lrwr5XGbKomWjVz98WcfDqaReI3Bz/jx6x2VesTQZDOAl8CVackaxDL/2qWby1ZvrraXIZ5yEQHBvi4BavR/GFZQOCAAAQAAcAYAnQEqMAAoAD5RHo1FI6GhFVquqDgFBLSG2ALMIVvw3q4ix6tC3yb1G3kmqTCBWfEJfEPMfP7l/ltgAP7+R4Y//QKXxVvmENlWTE14vj4/+4WA0j9JQw8Phyu5lEu2U/gIak9ASN1auVLqjuiBNcXlWcLCOpzk4Nw2/xk+MwUSnUsWzt/jdgMGqd/c0M6FI5JETm4PMDBqTCPnbdkAkL9XsqdJ6gHS0BKSJCPq6hDSI2q9s7ETDxIXpHX2F8El35ZOql03xpwklQ3bnw7wD/y9RHnkx5tawCOe90K4b3Kj/+aILfz79/JAKfxTqmXg42hLSZ5tM4vC9JZPtwAAAA==';
+
+function withTimeout(promise, timeoutMs = SAVE_TIMEOUT_MS) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(new Error('Operation timed out'));
+        }, timeoutMs);
+        
+        promise
+            .then(result => {
+                clearTimeout(timer);
+                resolve(result);
+            })
+            .catch(error => {
+                clearTimeout(timer);
+                reject(error);
+            });
+    });
+}
+
+async function withRetry(fn, maxAttempts = MAX_RETRY_ATTEMPTS, delayMs = RETRY_DELAY_MS) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+            if (attempt < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+            }
+        }
+    }
+    throw lastError;
+}
 
 function trackBackgroundTask(promise) {
     pendingBackgroundTasks++;
     updateBeforeUnloadHandler();
-    return promise.finally(() => {
+    
+    const wrappedPromise = withTimeout(promise, SAVE_TIMEOUT_MS)
+        .catch(error => {
+            console.warn('Background task failed or timed out:', error.message);
+        });
+    
+    return wrappedPromise.finally(() => {
         pendingBackgroundTasks--;
         updateBeforeUnloadHandler();
     });
@@ -89,9 +132,13 @@ async function saveMessage(role, content, conversationId = null, userId = null) 
     }
     
     try {
-        await saveMessageToSupabase(convId, uId, role, content);
+        await withRetry(
+            () => withTimeout(saveMessageToSupabase(convId, uId, role, content), SAVE_TIMEOUT_MS),
+            MAX_RETRY_ATTEMPTS,
+            RETRY_DELAY_MS
+        );
     } catch (error) {
-        console.error('Failed to save message:', error);
+        console.error('Failed to save message after retries:', error);
     }
 }
 
@@ -518,27 +565,9 @@ async function handleSendMessage() {
             
             trackBackgroundTask(
                 saveMessage('ai', aiResponse, convIdAtSend, userIdAtSend)
-                    .then(() => {
-                        return getMessageCount(convIdAtSend);
-                    })
-                    .then(messageCount => {
-                        if (!messageCount) return;
-                        
-                        if (messageCount === 2) {
-                            updateConversationTitle(convIdAtSend, titleForConv)
-                                .then(() => {
-                                    const updated = updateSidebarTitleLocally(convIdAtSend, titleForConv);
-                                    if (!updated) {
-                                        loadConversationHistory().catch(() => {});
-                                    }
-                                })
-                                .catch(() => {});
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Failed to save AI response:', error);
-                    })
             );
+            
+            updateConversationTitleIfNeeded(convIdAtSend, titleForConv);
             
         } catch (error) {
             typingMessage.remove();
@@ -575,6 +604,21 @@ async function createNewConversation() {
     } catch (error) {
         console.error('Error creating conversation:', error);
         return null;
+    }
+}
+
+async function updateConversationTitleIfNeeded(conversationId, title) {
+    try {
+        const messageCount = await withTimeout(getMessageCount(conversationId), 10000);
+        if (messageCount === 2) {
+            await withTimeout(updateConversationTitle(conversationId, title), 10000);
+            const updated = updateSidebarTitleLocally(conversationId, title);
+            if (!updated) {
+                loadConversationHistory().catch(() => {});
+            }
+        }
+    } catch (error) {
+        console.warn('Title update skipped:', error.message);
     }
 }
 
