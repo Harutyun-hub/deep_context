@@ -1054,21 +1054,26 @@ function hideWelcomeMessage() {
 
 async function handleNewChatClick(e) {
     e.preventDefault();
+    console.log('[NewChat] Button clicked');
     try {
         const messagesContainer = document.getElementById('messages');
         messagesContainer.innerHTML = '';
         
         showWelcomeMessage();
         
-        await createNewConversation();
+        console.log('[NewChat] Creating new conversation...');
+        const result = await createNewConversation();
+        console.log('[NewChat] createNewConversation result:', result, 'currentConversationId:', currentConversationId);
         
         if (currentConversationId) {
+            console.log('[NewChat] Loading conversation history...');
             await loadConversationHistory();
+            console.log('[NewChat] Conversation history loaded');
         } else {
             throw new Error('Failed to create new conversation');
         }
     } catch (error) {
-        console.error('New chat error:', error);
+        console.error('[NewChat] Error:', error);
         handleError(error, 'Create new chat');
     }
 }
