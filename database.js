@@ -1,5 +1,6 @@
 async function createConversation(userId, title = null, sessionId = null) {
     const supabase = getSupabase();
+    console.log('[DB] Creating conversation for user:', userId);
     
     const { data, error } = await supabase
         .from('conversations')
@@ -12,10 +13,11 @@ async function createConversation(userId, title = null, sessionId = null) {
         .single();
     
     if (error) {
-        console.error('Error creating conversation:', error);
+        console.error('[DB] Error creating conversation:', error);
         throw error;
     }
     
+    console.log('[DB] Conversation created:', data.id);
     return data;
 }
 
@@ -56,6 +58,7 @@ async function getConversation(conversationId) {
 
 async function updateConversationTitle(conversationId, title) {
     const supabase = getSupabase();
+    console.log('[DB] Updating conversation title:', { conversationId, title });
     
     const { data, error } = await supabase
         .from('conversations')
@@ -65,10 +68,11 @@ async function updateConversationTitle(conversationId, title) {
         .single();
     
     if (error) {
-        console.error('Error updating conversation title:', error);
+        console.error('[DB] Error updating conversation title:', error);
         throw error;
     }
     
+    console.log('[DB] Title updated successfully');
     return data;
 }
 
@@ -89,6 +93,7 @@ async function deleteConversation(conversationId) {
 
 async function saveMessageToSupabase(conversationId, userId, role, content) {
     const supabase = getSupabase();
+    console.log('[DB] Saving message:', { conversationId, role, contentLength: content?.length });
     
     let contentToSave = content;
     if (typeof content === 'object' && content !== null) {
@@ -107,16 +112,18 @@ async function saveMessageToSupabase(conversationId, userId, role, content) {
         .single();
     
     if (error) {
-        console.error('Error saving message:', error);
+        console.error('[DB] Error saving message:', error);
         throw error;
     }
+    
+    console.log('[DB] Message saved successfully:', data.id);
     
     supabase
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', conversationId)
-        .then(() => {})
-        .catch(err => console.error('Error updating conversation timestamp:', err));
+        .then(() => console.log('[DB] Conversation timestamp updated'))
+        .catch(err => console.error('[DB] Error updating conversation timestamp:', err));
     
     return data;
 }
@@ -172,6 +179,7 @@ async function deleteAllUserConversations(userId) {
 
 async function getMessageCount(conversationId) {
     const supabase = getSupabase();
+    console.log('[DB] Getting message count for conversation:', conversationId);
     
     const { count, error } = await supabase
         .from('messages')
@@ -179,9 +187,10 @@ async function getMessageCount(conversationId) {
         .eq('conversation_id', conversationId);
     
     if (error) {
-        console.error('Error counting messages:', error);
+        console.error('[DB] Error counting messages:', error);
         return 0;
     }
     
+    console.log('[DB] Message count:', count);
     return count || 0;
 }

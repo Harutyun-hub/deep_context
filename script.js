@@ -546,11 +546,11 @@ async function handleSendMessage() {
         
         addMessageToUI('user', userMessage);
         
-        trackBackgroundTask(
-            saveMessage('user', userMessage, convIdAtSend, userIdAtSend).catch(error => {
-                console.error('Failed to save user message:', error);
-            })
-        );
+        const userSavePromise = saveMessage('user', userMessage, convIdAtSend, userIdAtSend).catch(error => {
+            console.error('Failed to save user message:', error);
+            showToast('Failed to save message', 'error');
+            return null;
+        });
         
         const typingMessage = addMessageToUI('ai', '', true);
         
@@ -563,10 +563,15 @@ async function handleSendMessage() {
             
             const titleForConv = userMessage.length > 50 ? userMessage.substring(0, 50) + '...' : userMessage;
             
-            trackBackgroundTask(
-                saveMessage('ai', aiResponse, convIdAtSend, userIdAtSend)
-            );
+            const aiSavePromise = saveMessage('ai', aiResponse, convIdAtSend, userIdAtSend).catch(error => {
+                console.error('Failed to save AI message:', error);
+                return null;
+            });
             
+            // Wait for both messages to save before updating title
+            await Promise.all([userSavePromise, aiSavePromise]);
+            
+            // Now message count will be accurate
             updateConversationTitleIfNeeded(convIdAtSend, titleForConv);
             
         } catch (error) {
@@ -655,14 +660,16 @@ async function loadConversation(conversationId) {
         
         if (messages.length === 0) {
             showWelcomeMessage();
+            // Don't cache empty conversations - allow reload when messages arrive
+            lastSuccessfulConversationId = null;
         } else {
             hideWelcomeMessage();
             messages.forEach(msg => {
                 addMessageToUI(msg.role, msg.content);
             });
+            // Only cache when we have actual messages
+            lastSuccessfulConversationId = conversationId;
         }
-        
-        lastSuccessfulConversationId = conversationId;
         
     } catch (error) {
         console.error('Error loading conversation:', error);
