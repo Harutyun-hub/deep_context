@@ -5,6 +5,13 @@ let chatDropdownListenerAttached = false;
 let isLoadingConversation = false;
 let pendingBackgroundTasks = 0;
 
+// Lifecycle management for cleanup
+let currentTypingInterval = null;
+let currentLoadAbortController = null;
+let currentAIAbortController = null;
+const AI_FETCH_TIMEOUT_MS = 60000; // 60 second timeout for AI responses
+const INPUT_UNLOCK_TIMEOUT_MS = 65000; // Safety timeout to always unlock input
+
 const SAVE_TIMEOUT_MS = 30000;
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 1000;
@@ -71,21 +78,23 @@ function updateBeforeUnloadHandler() {
     }
 }
 
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
+// Note: Uses debounce from utils.js
 const debouncedLoadConversation = debounce((conversationId) => {
     loadConversation(conversationId);
 }, 300);
+
+// Page visibility change handler - unlock input when user returns to tab
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        // When user returns to tab, ensure input is usable
+        const input = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        if (input && input.disabled && !isLoadingConversation) {
+            console.log('Visibility change - resetting input state');
+            forceUnlockInput();
+        }
+    }
+});
 
 function closeAllChatDropdowns(e) {
     if (e && (e.target.closest('.chat-item-menu-btn') || e.target.closest('.chat-item-dropdown'))) {
@@ -102,8 +111,59 @@ function cleanupChatDropdowns() {
     }
 }
 
+// Cleanup typing effect interval
+function cleanupTypingEffect() {
+    if (currentTypingInterval) {
+        clearInterval(currentTypingInterval);
+        currentTypingInterval = null;
+    }
+    // Remove any lingering typing cursors
+    document.querySelectorAll('.typing-cursor').forEach(cursor => cursor.remove());
+}
+
+// Cancel any ongoing conversation load
+function cancelConversationLoad() {
+    if (currentLoadAbortController) {
+        currentLoadAbortController.abort();
+        currentLoadAbortController = null;
+    }
+}
+
+// Cancel any ongoing AI request
+function cancelAIRequest() {
+    if (currentAIAbortController) {
+        currentAIAbortController.abort();
+        currentAIAbortController = null;
+    }
+}
+
+// Force unlock input (safety mechanism)
+function forceUnlockInput() {
+    const input = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    if (input) {
+        input.disabled = false;
+        input.focus();
+    }
+    if (sendBtn) {
+        sendBtn.disabled = false;
+    }
+}
+
+// Master cleanup function for logout/navigation
+function cleanupAllState() {
+    cleanupTypingEffect();
+    cancelConversationLoad();
+    cancelAIRequest();
+    cleanupChatDropdowns();
+    forceUnlockInput();
+    isLoadingConversation = false;
+    isInitialized = false;
+}
+
 if (typeof window !== 'undefined') {
     window.cleanupChatDropdowns = cleanupChatDropdowns;
+    window.cleanupAllState = cleanupAllState;
 }
 
 function generateUUID() {
@@ -349,7 +409,8 @@ function addMessageToUI(role, content, isTyping = false, enableTypingEffect = fa
                 messageDiv.appendChild(contentDiv);
                 messagesContainer.appendChild(messageDiv);
                 
-                showTypingEffect(content, contentDiv);
+                // Attach typing promise to the element for awaiting
+                messageDiv.typingPromise = showTypingEffect(content, contentDiv);
                 return messageDiv;
             } else {
                 contentDiv.innerHTML = renderMessage(content);
@@ -388,75 +449,100 @@ function copyMessageText(contentDiv, copyBtn) {
 }
 
 function showTypingEffect(content, contentDiv) {
-    const renderedContent = renderMessage(content);
-    contentDiv.innerHTML = renderedContent;
-    
-    const elementsToAnimate = [];
-    const textNodes = [];
-    
-    function extractTextNodes(node) {
-        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-            textNodes.push(node);
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-            if (node.classList && (node.classList.contains('chart-container') || 
-                node.classList.contains('data-table') || 
-                node.classList.contains('media-gallery') ||
-                node.tagName === 'CANVAS')) {
+    return new Promise((resolve) => {
+        // Cleanup any existing typing effect first
+        cleanupTypingEffect();
+        
+        try {
+            const renderedContent = renderMessage(content);
+            contentDiv.innerHTML = renderedContent;
+            
+            const elementsToAnimate = [];
+            const textNodes = [];
+            
+            function extractTextNodes(node) {
+                if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                    textNodes.push(node);
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.classList && (node.classList.contains('chart-container') || 
+                        node.classList.contains('data-table') || 
+                        node.classList.contains('media-gallery') ||
+                        node.tagName === 'CANVAS')) {
+                        return;
+                    }
+                    for (let child of node.childNodes) {
+                        extractTextNodes(child);
+                    }
+                }
+            }
+            
+            extractTextNodes(contentDiv);
+            
+            if (textNodes.length === 0) {
+                resolve();
                 return;
             }
-            for (let child of node.childNodes) {
-                extractTextNodes(child);
+            
+            textNodes.forEach(node => {
+                const originalText = node.textContent;
+                const words = originalText.split(' ');
+                elementsToAnimate.push({ node, words, originalText, currentIndex: 0 });
+                node.textContent = '';
+            });
+            
+            const cursor = document.createElement('span');
+            cursor.className = 'typing-cursor';
+            
+            if (textNodes.length > 0) {
+                const lastNode = textNodes[textNodes.length - 1];
+                lastNode.parentNode.insertBefore(cursor, lastNode.nextSibling);
             }
+            
+            let globalWordIndex = 0;
+            const totalWords = elementsToAnimate.reduce((sum, item) => sum + item.words.length, 0);
+            
+            // Store interval globally for cleanup
+            currentTypingInterval = setInterval(() => {
+                try {
+                    for (let item of elementsToAnimate) {
+                        if (item.currentIndex < item.words.length) {
+                            const word = item.words[item.currentIndex];
+                            item.node.textContent += (item.currentIndex === 0 ? '' : ' ') + word;
+                            item.currentIndex++;
+                            globalWordIndex++;
+                            break;
+                        }
+                    }
+                    
+                    const chatContainer = document.getElementById('chatContainer');
+                    if (chatContainer) {
+                        const isNearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 100;
+                        if (isNearBottom) {
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    }
+                    
+                    if (globalWordIndex >= totalWords) {
+                        clearInterval(currentTypingInterval);
+                        currentTypingInterval = null;
+                        cursor.remove();
+                        resolve();
+                    }
+                } catch (err) {
+                    console.error('Typing effect error:', err);
+                    clearInterval(currentTypingInterval);
+                    currentTypingInterval = null;
+                    cursor.remove();
+                    resolve();
+                }
+            }, 60);
+        } catch (err) {
+            console.error('Failed to render message:', err);
+            // Fallback: just show the content without animation
+            contentDiv.textContent = typeof content === 'string' ? content : JSON.stringify(content);
+            resolve();
         }
-    }
-    
-    extractTextNodes(contentDiv);
-    
-    if (textNodes.length === 0) {
-        return;
-    }
-    
-    textNodes.forEach(node => {
-        const originalText = node.textContent;
-        const words = originalText.split(' ');
-        elementsToAnimate.push({ node, words, originalText, currentIndex: 0 });
-        node.textContent = '';
     });
-    
-    const cursor = document.createElement('span');
-    cursor.className = 'typing-cursor';
-    
-    if (textNodes.length > 0) {
-        const lastNode = textNodes[textNodes.length - 1];
-        lastNode.parentNode.insertBefore(cursor, lastNode.nextSibling);
-    }
-    
-    let globalWordIndex = 0;
-    const totalWords = elementsToAnimate.reduce((sum, item) => sum + item.words.length, 0);
-    
-    const typingInterval = setInterval(() => {
-        for (let item of elementsToAnimate) {
-            if (item.currentIndex < item.words.length) {
-                const word = item.words[item.currentIndex];
-                item.node.textContent += (item.currentIndex === 0 ? '' : ' ') + word;
-                item.currentIndex++;
-                globalWordIndex++;
-                break;
-            }
-        }
-        
-        const chatContainer = document.getElementById('chatContainer');
-        const isNearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 100;
-        
-        if (isNearBottom) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-        
-        if (globalWordIndex >= totalWords) {
-            clearInterval(typingInterval);
-            cursor.remove();
-        }
-    }, 60);
 }
 
 function scrollToBottom(force = false) {
@@ -469,6 +555,15 @@ function scrollToBottom(force = false) {
 }
 
 async function getAIResponse(userMessage, sessionId, userId) {
+    // Cancel any existing AI request
+    cancelAIRequest();
+    
+    // Create local abort controller for this request
+    const localAbortController = new AbortController();
+    currentAIAbortController = localAbortController;
+    
+    let timeoutId = null;
+    
     try {
         const companyFilter = document.getElementById('chatCompanyFilter');
         const selectedCompany = companyFilter ? companyFilter.value : '';
@@ -480,13 +575,34 @@ async function getAIResponse(userMessage, sessionId, userId) {
             companyKey: selectedCompany || null
         };
         
-        const response = await fetch('https://wimedia.app.n8n.cloud/webhook/chat', {
+        // Create a timeout that aborts the local controller
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                // Only abort if this is still the current request
+                if (currentAIAbortController === localAbortController) {
+                    localAbortController.abort();
+                }
+                reject(new Error('AI response timed out after 60 seconds'));
+            }, AI_FETCH_TIMEOUT_MS);
+        });
+        
+        // Race between fetch and timeout
+        const fetchPromise = fetch('https://wimedia.app.n8n.cloud/webhook/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            signal: localAbortController.signal
         });
+        
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        // Clear timeout immediately on success
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -509,8 +625,23 @@ async function getAIResponse(userMessage, sessionId, userId) {
             return data;
         }
     } catch (error) {
+        // Clear timeout on error
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+        
+        if (error.name === 'AbortError') {
+            console.log('AI request was cancelled');
+            throw new Error('Request was cancelled');
+        }
         console.error('Error fetching AI response:', error);
         throw error;
+    } finally {
+        // Only clear global if this is still the current controller
+        if (currentAIAbortController === localAbortController) {
+            currentAIAbortController = null;
+        }
     }
 }
 
@@ -529,6 +660,12 @@ async function handleSendMessage() {
     
     input.disabled = true;
     sendBtn.disabled = true;
+    
+    // Safety timeout: always unlock input after max time
+    const safetyUnlockTimeout = setTimeout(() => {
+        console.warn('Safety timeout triggered - unlocking input');
+        forceUnlockInput();
+    }, INPUT_UNLOCK_TIMEOUT_MS);
     
     try {
         if (!currentConversationId) {
@@ -559,7 +696,14 @@ async function handleSendMessage() {
             const aiResponse = await getAIResponse(userMessage, sessionId, user.id);
             
             typingMessage.remove();
-            addMessageToUI('ai', aiResponse, false, true);
+            
+            // Handle async typing effect - await its completion
+            const aiMessageDiv = addMessageToUI('ai', aiResponse, false, true);
+            
+            // Wait for typing effect to complete if it returns a promise
+            if (aiMessageDiv && aiMessageDiv.typingPromise) {
+                await aiMessageDiv.typingPromise;
+            }
             
             const titleForConv = userMessage.length > 50 ? userMessage.substring(0, 50) + '...' : userMessage;
             
@@ -576,6 +720,7 @@ async function handleSendMessage() {
             
         } catch (error) {
             typingMessage.remove();
+            cleanupTypingEffect();
             console.error('AI response error:', error);
             
             const errorMessage = "I'm sorry, I'm having trouble connecting right now. Please try again.";
@@ -588,6 +733,9 @@ async function handleSendMessage() {
         handleError(error, 'Send message');
         input.value = message;
     } finally {
+        // Clear safety timeout
+        clearTimeout(safetyUnlockTimeout);
+        // Ensure input is always unlocked
         input.disabled = false;
         sendBtn.disabled = false;
         input.focus();
@@ -627,28 +775,48 @@ async function updateConversationTitleIfNeeded(conversationId, title) {
     }
 }
 
-let lastSuccessfulConversationId = null;
-
 async function loadConversation(conversationId) {
-    if (isLoadingConversation) {
-        console.log('Already loading a conversation, skipping...');
+    // Cancel any existing load operation
+    cancelConversationLoad();
+    
+    // If already loading the same conversation, skip
+    if (isLoadingConversation && conversationId === currentConversationId) {
+        console.log('Already loading this conversation, skipping...');
         return;
     }
     
-    if (conversationId === lastSuccessfulConversationId) {
-        console.log('Same conversation already loaded successfully, skipping...');
-        return;
-    }
-    
+    // Create new abort controller for this load
+    currentLoadAbortController = new AbortController();
     isLoadingConversation = true;
+    
     const messagesContainer = document.getElementById('messages');
     const previousConversationId = currentConversationId;
+    
+    // Add timeout for loading to prevent infinite loading state
+    const loadTimeout = setTimeout(() => {
+        if (isLoadingConversation) {
+            console.warn('Load timeout - resetting loading state');
+            isLoadingConversation = false;
+            messagesContainer.innerHTML = '<div class="error-message">Loading timed out. Click to try again.</div>';
+        }
+    }, 30000);
     
     try {
         hideWelcomeMessage();
         messagesContainer.innerHTML = `<div style="text-align: center; padding: 40px;"><div class="loading-spinner"><img src="${NIMBUS_AVATAR_BASE64}" alt="Loading"></div></div>`;
         
+        // Check if aborted before making request
+        if (currentLoadAbortController?.signal.aborted) {
+            throw new Error('Load cancelled');
+        }
+        
         const conversation = await getConversation(conversationId);
+        
+        // Check if aborted after getting conversation
+        if (currentLoadAbortController?.signal.aborted) {
+            throw new Error('Load cancelled');
+        }
+        
         const loadedSessionId = conversation.session_id || generateUUID();
         
         currentConversationId = conversationId;
@@ -658,26 +826,33 @@ async function loadConversation(conversationId) {
         
         const messages = await loadMessages();
         
+        // Check if aborted after loading messages
+        if (currentLoadAbortController?.signal.aborted) {
+            throw new Error('Load cancelled');
+        }
+        
         if (messages.length === 0) {
             showWelcomeMessage();
-            // Don't cache empty conversations - allow reload when messages arrive
-            lastSuccessfulConversationId = null;
         } else {
             hideWelcomeMessage();
             messages.forEach(msg => {
                 addMessageToUI(msg.role, msg.content);
             });
-            // Only cache when we have actual messages
-            lastSuccessfulConversationId = conversationId;
         }
         
     } catch (error) {
+        if (error.message === 'Load cancelled') {
+            console.log('Conversation load was cancelled');
+            return;
+        }
         console.error('Error loading conversation:', error);
         messagesContainer.innerHTML = '<div class="error-message">Failed to load conversation. Click to try again.</div>';
         showToast('Failed to load conversation', 'error');
         currentConversationId = previousConversationId;
     } finally {
+        clearTimeout(loadTimeout);
         isLoadingConversation = false;
+        currentLoadAbortController = null;
     }
 }
 

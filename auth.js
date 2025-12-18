@@ -94,7 +94,10 @@ async function signOut() {
         throw error;
     }
     
-    if (typeof window.cleanupChatDropdowns === 'function') {
+    // Cleanup all chat state before navigating away
+    if (typeof window.cleanupAllState === 'function') {
+        window.cleanupAllState();
+    } else if (typeof window.cleanupChatDropdowns === 'function') {
         window.cleanupChatDropdowns();
     }
     
