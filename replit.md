@@ -89,6 +89,16 @@ The application is built with vanilla HTML, CSS, and JavaScript.
     - Browser beforeunload warning when background work is in progress
     - Loading lock prevents duplicate conversation loads during async operations
     - Failed conversation loads allow immediate retry without navigating away
+- **Enterprise Chat State Machine** (Added December 2025):
+    - Finite state machine with IDLE/SENDING/AWAITING_AI/RENDERING/ERROR states
+    - Automatic UI sync: input/button enabled states controlled by state machine, not manual calls
+    - State-based guards prevent duplicate message sends while processing
+    - Guaranteed IDLE state return in finally blocks prevents permanent freezes
+    - Global safety watchdog: 60s timeout auto-resets stuck states
+    - Typing effect timeout: 15s max with guaranteed promise resolution
+    - AI request timeout: 45s with proper abort controller cleanup
+    - Console logging for all state transitions aids debugging
+    - Exposed `ChatStateMachine` and `ChatState` on window for runtime debugging
 - **Server**: Python HTTP server providing a `/api/config` endpoint for secure credential delivery (Supabase anon key).
 - **Competitive Intelligence Suite**: `dashboard.html` with `intelligence.js` and `intelligence.css` for 4-pillar competitive analysis:
   - Data loading functions use `getCompanyIdsFromFilters()` helper for client-vs-competitor comparison
