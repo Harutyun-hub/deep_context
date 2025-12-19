@@ -204,11 +204,14 @@ const debouncedLoadConversation = debounce((conversationId) => {
     loadConversation(conversationId);
 }, 300);
 
-// Page visibility change handler - just sync UI, don't abort operations
+// Page visibility change handler - mark auth as settling when returning to tab
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-        // When user returns to tab, just log state and sync UI (don't force reset)
         console.log('[Visibility] Tab visible, current state:', ChatStateMachine.getState());
+        // Mark auth as potentially settling - Supabase may refresh token
+        if (typeof markAuthSettling === 'function') {
+            markAuthSettling();
+        }
         // Re-sync UI in case it got out of sync
         ChatStateMachine.syncUI();
     }
@@ -956,6 +959,21 @@ async function loadConversation(conversationId) {
     isLoadingConversation = true;
     
     console.log(`[LoadConv] [${loadRequestId}] START loading conversation:`, conversationId);
+    
+    // Wait for auth to settle if needed (after visibility change)
+    if (typeof waitForAuthReady === 'function') {
+        await waitForAuthReady();
+    }
+    
+    // Verify session is valid before proceeding
+    if (typeof ensureValidSession === 'function') {
+        const session = await ensureValidSession();
+        if (!session) {
+            console.error(`[LoadConv] [${loadRequestId}] No valid session, aborting load`);
+            isLoadingConversation = false;
+            return;
+        }
+    }
     
     const messagesContainer = document.getElementById('messages');
     const previousConversationId = currentConversationId;

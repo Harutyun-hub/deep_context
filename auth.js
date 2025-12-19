@@ -1,5 +1,7 @@
 let currentUser = null;
 let authSupabase = null;
+let authSettling = false;
+let authSettlePromise = null;
 
 async function initAuth() {
     authSupabase = await initSupabase();
@@ -44,9 +46,77 @@ async function initAuth() {
         if (!session && event !== 'SIGNED_OUT' && event !== 'INITIAL_SESSION') {
             console.warn('[Auth] Session became null unexpectedly during event:', event);
         }
+        
+        // Mark auth as settled after any auth event
+        if (authSettling) {
+            console.log('[Auth] Auth state settled after event:', event);
+            authSettling = false;
+        }
     });
     
     return session;
+}
+
+function markAuthSettling() {
+    authSettling = true;
+    console.log('[Auth] Marked auth as settling (visibility change)');
+}
+
+async function waitForAuthReady() {
+    if (!authSettling) {
+        return true;
+    }
+    
+    console.log('[Auth] Waiting for auth to settle...');
+    
+    // Wait up to 2 seconds for auth to settle
+    const maxWait = 2000;
+    const checkInterval = 100;
+    let waited = 0;
+    
+    while (authSettling && waited < maxWait) {
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+        waited += checkInterval;
+    }
+    
+    if (authSettling) {
+        console.log('[Auth] Auth did not settle in time, forcing ready');
+        authSettling = false;
+    } else {
+        console.log('[Auth] Auth settled after', waited, 'ms');
+    }
+    
+    // Small additional delay to ensure Supabase client is ready
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    return true;
+}
+
+async function ensureValidSession() {
+    if (!authSupabase) {
+        console.warn('[Auth] ensureValidSession: No Supabase client');
+        return null;
+    }
+    
+    try {
+        const { data: { session }, error } = await authSupabase.auth.getSession();
+        
+        if (error) {
+            console.error('[Auth] ensureValidSession error:', error);
+            return null;
+        }
+        
+        if (!session) {
+            console.warn('[Auth] ensureValidSession: No active session');
+            return null;
+        }
+        
+        console.log('[Auth] ensureValidSession: Session valid, expires:', new Date(session.expires_at * 1000).toISOString());
+        return session;
+    } catch (err) {
+        console.error('[Auth] ensureValidSession exception:', err);
+        return null;
+    }
 }
 
 async function ensureUserExists(user) {

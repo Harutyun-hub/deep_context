@@ -1,0 +1,223 @@
+✓ Profile button listener attached
+index.html:225 ✓ Click outside listener attached
+index.html:230 ✓ Logout button listener attached
+config.js:36 Supabase client initialized
+index.html:182 ✓ Auth complete, initializing chat...
+database.js:45 [DB] getUserConversations START: d6f796b4-0c84-43cf-9ea1-3ae1237d872a at 2025-12-19T16:59:12.354Z
+auth.js:20 [Auth] onAuthStateChange event: INITIAL_SESSION hasSession: true at 2025-12-19T16:59:12.354Z
+auth.js:24 [Auth] Session expires at: 2025-12-19T17:09:59.000Z
+database.js:59 [DB] getUserConversations END: d6f796b4-0c84-43cf-9ea1-3ae1237d872a count: 11 at 2025-12-19T16:59:12.559Z
+script.js:958 [LoadConv] [load_1_1766163552560] START loading conversation: 83aa317a-17d0-47a4-8137-459d06a3f374
+script.js:982 [LoadConv] [load_1_1766163552560] Calling getConversation...
+database.js:67 [DB] [req_1_1766163552560] getConversation START: 83aa317a-17d0-47a4-8137-459d06a3f374 at 2025-12-19T16:59:12.560Z
+database.js:80 [DB] [req_1_1766163552560] getConversation RESPONSE: Object
+database.js:93 [DB] [req_1_1766163552560] getConversation END: 83aa317a-17d0-47a4-8137-459d06a3f374 elapsed: 175ms
+script.js:984 [LoadConv] [load_1_1766163552560] getConversation returned successfully
+script.js:998 [LoadConv] [load_1_1766163552560] Calling loadMessages...
+database.js:178 [DB] [req_2_1766163552735] loadMessagesFromSupabase START: 83aa317a-17d0-47a4-8137-459d06a3f374 at 2025-12-19T16:59:12.735Z
+database.js:191 [DB] [req_2_1766163552735] loadMessagesFromSupabase RESPONSE: Object
+database.js:205 [DB] [req_2_1766163552735] loadMessagesFromSupabase END: 83aa317a-17d0-47a4-8137-459d06a3f374 count: 9 elapsed: 197ms
+script.js:1000 [LoadConv] [load_1_1766163552560] loadMessages returned 9 messages
+script.js:1016 [LoadConv] [load_1_1766163552560] END - conversation loaded successfully
+script.js:958 [LoadConv] [load_2_1766163560039] START loading conversation: 1c051d48-4509-4e0e-b5f3-f2208f586888
+script.js:982 [LoadConv] [load_2_1766163560039] Calling getConversation...
+database.js:67 [DB] [req_3_1766163560039] getConversation START: 1c051d48-4509-4e0e-b5f3-f2208f586888 at 2025-12-19T16:59:20.039Z
+database.js:80 [DB] [req_3_1766163560039] getConversation RESPONSE: Object
+database.js:93 [DB] [req_3_1766163560039] getConversation END: 1c051d48-4509-4e0e-b5f3-f2208f586888 elapsed: 159ms
+script.js:984 [LoadConv] [load_2_1766163560039] getConversation returned successfully
+script.js:998 [LoadConv] [load_2_1766163560039] Calling loadMessages...
+database.js:178 [DB] [req_4_1766163560198] loadMessagesFromSupabase START: 1c051d48-4509-4e0e-b5f3-f2208f586888 at 2025-12-19T16:59:20.198Z
+database.js:191 [DB] [req_4_1766163560198] loadMessagesFromSupabase RESPONSE: Object
+database.js:205 [DB] [req_4_1766163560198] loadMessagesFromSupabase END: 1c051d48-4509-4e0e-b5f3-f2208f586888 count: 6 elapsed: 164ms
+script.js:1000 [LoadConv] [load_2_1766163560039] loadMessages returned 6 messages
+script.js:1016 [LoadConv] [load_2_1766163560039] END - conversation loaded successfully
+script.js:958 [LoadConv] [load_3_1766163564746] START loading conversation: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7
+script.js:982 [LoadConv] [load_3_1766163564746] Calling getConversation...
+database.js:67 [DB] [req_5_1766163564746] getConversation START: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 at 2025-12-19T16:59:24.746Z
+database.js:80 [DB] [req_5_1766163564746] getConversation RESPONSE: Object
+database.js:93 [DB] [req_5_1766163564746] getConversation END: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 elapsed: 166ms
+script.js:984 [LoadConv] [load_3_1766163564746] getConversation returned successfully
+script.js:998 [LoadConv] [load_3_1766163564746] Calling loadMessages...
+database.js:178 [DB] [req_6_1766163564912] loadMessagesFromSupabase START: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 at 2025-12-19T16:59:24.912Z
+database.js:191 [DB] [req_6_1766163564912] loadMessagesFromSupabase RESPONSE: Object
+database.js:205 [DB] [req_6_1766163564912] loadMessagesFromSupabase END: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 count: 4 elapsed: 127ms
+script.js:1000 [LoadConv] [load_3_1766163564746] loadMessages returned 4 messages
+script.js:1016 [LoadConv] [load_3_1766163564746] END - conversation loaded successfully
+script.js:958 [LoadConv] [load_4_1766163569579] START loading conversation: 83aa317a-17d0-47a4-8137-459d06a3f374
+script.js:982 [LoadConv] [load_4_1766163569579] Calling getConversation...
+database.js:67 [DB] [req_7_1766163569580] getConversation START: 83aa317a-17d0-47a4-8137-459d06a3f374 at 2025-12-19T16:59:29.580Z
+database.js:80 [DB] [req_7_1766163569580] getConversation RESPONSE: Object
+database.js:93 [DB] [req_7_1766163569580] getConversation END: 83aa317a-17d0-47a4-8137-459d06a3f374 elapsed: 150ms
+script.js:984 [LoadConv] [load_4_1766163569579] getConversation returned successfully
+script.js:998 [LoadConv] [load_4_1766163569579] Calling loadMessages...
+database.js:178 [DB] [req_8_1766163569730] loadMessagesFromSupabase START: 83aa317a-17d0-47a4-8137-459d06a3f374 at 2025-12-19T16:59:29.730Z
+database.js:191 [DB] [req_8_1766163569730] loadMessagesFromSupabase RESPONSE: Object
+database.js:205 [DB] [req_8_1766163569730] loadMessagesFromSupabase END: 83aa317a-17d0-47a4-8137-459d06a3f374 count: 9 elapsed: 114ms
+script.js:1000 [LoadConv] [load_4_1766163569579] loadMessages returned 9 messages
+script.js:1016 [LoadConv] [load_4_1766163569579] END - conversation loaded successfully
+script.js:52 [ChatState] IDLE → SENDING (User sent message)
+script.js:101 [ChatState] UI sync: input/button DISABLED
+database.js:139 [DB] Saving message: Object
+script.js:52 [ChatState] SENDING → AWAITING_AI (Waiting for AI response)
+script.js:101 [ChatState] UI sync: input/button DISABLED
+database.js:162 [DB] Message saved successfully: de309f83-fc1b-49c5-af64-9fac6dc56e00
+database.js:168 [DB] Conversation timestamp updated
+script.js:52 [ChatState] AWAITING_AI → RENDERING (Rendering AI response)
+script.js:101 [ChatState] UI sync: input/button DISABLED
+script.js:585 [TypingEffect] Resolved
+database.js:139 [DB] Saving message: Object
+database.js:162 [DB] Message saved successfully: 7831e716-423e-47cc-8211-52ed781a702f
+database.js:248 [DB] Getting message count for conversation: 83aa317a-17d0-47a4-8137-459d06a3f374
+script.js:52 [ChatState] RENDERING → IDLE (Message cycle complete)
+script.js:101 [ChatState] UI sync: input/button ENABLED
+script.js:904 [SendMessage] Cycle complete, state: Object
+database.js:168 [DB] Conversation timestamp updated
+database.js:260 [DB] Message count: 11
+script.js:958 [LoadConv] [load_5_1766163596154] START loading conversation: 1c051d48-4509-4e0e-b5f3-f2208f586888
+script.js:982 [LoadConv] [load_5_1766163596154] Calling getConversation...
+database.js:67 [DB] [req_9_1766163596155] getConversation START: 1c051d48-4509-4e0e-b5f3-f2208f586888 at 2025-12-19T16:59:56.155Z
+database.js:80 [DB] [req_9_1766163596155] getConversation RESPONSE: {hasData: true, error: null, status: 200, statusText: '', elapsedMs: 111}
+database.js:93 [DB] [req_9_1766163596155] getConversation END: 1c051d48-4509-4e0e-b5f3-f2208f586888 elapsed: 111ms
+script.js:984 [LoadConv] [load_5_1766163596154] getConversation returned successfully
+script.js:998 [LoadConv] [load_5_1766163596154] Calling loadMessages...
+database.js:178 [DB] [req_10_1766163596266] loadMessagesFromSupabase START: 1c051d48-4509-4e0e-b5f3-f2208f586888 at 2025-12-19T16:59:56.266Z
+database.js:191 [DB] [req_10_1766163596266] loadMessagesFromSupabase RESPONSE: {hasData: true, count: 6, error: null, status: 200, statusText: '', …}
+database.js:205 [DB] [req_10_1766163596266] loadMessagesFromSupabase END: 1c051d48-4509-4e0e-b5f3-f2208f586888 count: 6 elapsed: 111ms
+script.js:1000 [LoadConv] [load_5_1766163596154] loadMessages returned 6 messages
+script.js:1016 [LoadConv] [load_5_1766163596154] END - conversation loaded successfully
+script.js:958 [LoadConv] [load_6_1766163597979] START loading conversation: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7
+script.js:982 [LoadConv] [load_6_1766163597979] Calling getConversation...
+database.js:67 [DB] [req_11_1766163597980] getConversation START: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 at 2025-12-19T16:59:57.980Z
+database.js:80 [DB] [req_11_1766163597980] getConversation RESPONSE: {hasData: true, error: null, status: 200, statusText: '', elapsedMs: 107}
+database.js:93 [DB] [req_11_1766163597980] getConversation END: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 elapsed: 107ms
+script.js:984 [LoadConv] [load_6_1766163597979] getConversation returned successfully
+script.js:998 [LoadConv] [load_6_1766163597979] Calling loadMessages...
+database.js:178 [DB] [req_12_1766163598087] loadMessagesFromSupabase START: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 at 2025-12-19T16:59:58.087Z
+database.js:191 [DB] [req_12_1766163598087] loadMessagesFromSupabase RESPONSE: {hasData: true, count: 4, error: null, status: 200, statusText: '', …}
+database.js:205 [DB] [req_12_1766163598087] loadMessagesFromSupabase END: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 count: 4 elapsed: 110ms
+script.js:1000 [LoadConv] [load_6_1766163597979] loadMessages returned 4 messages
+script.js:1016 [LoadConv] [load_6_1766163597979] END - conversation loaded successfully
+script.js:958 [LoadConv] [load_7_1766163604916] START loading conversation: 83aa317a-17d0-47a4-8137-459d06a3f374
+script.js:982 [LoadConv] [load_7_1766163604916] Calling getConversation...
+database.js:67 [DB] [req_13_1766163604916] getConversation START: 83aa317a-17d0-47a4-8137-459d06a3f374 at 2025-12-19T17:00:04.916Z
+database.js:80 [DB] [req_13_1766163604916] getConversation RESPONSE: {hasData: true, error: null, status: 200, statusText: '', elapsedMs: 118}
+database.js:93 [DB] [req_13_1766163604916] getConversation END: 83aa317a-17d0-47a4-8137-459d06a3f374 elapsed: 118ms
+script.js:984 [LoadConv] [load_7_1766163604916] getConversation returned successfully
+script.js:998 [LoadConv] [load_7_1766163604916] Calling loadMessages...
+database.js:178 [DB] [req_14_1766163605035] loadMessagesFromSupabase START: 83aa317a-17d0-47a4-8137-459d06a3f374 at 2025-12-19T17:00:05.035Z
+database.js:191 [DB] [req_14_1766163605035] loadMessagesFromSupabase RESPONSE: {hasData: true, count: 11, error: null, status: 200, statusText: '', …}
+database.js:205 [DB] [req_14_1766163605035] loadMessagesFromSupabase END: 83aa317a-17d0-47a4-8137-459d06a3f374 count: 11 elapsed: 112ms
+script.js:1000 [LoadConv] [load_7_1766163604916] loadMessages returned 11 messages
+script.js:1016 [LoadConv] [load_7_1766163604916] END - conversation loaded successfully
+script.js:52 [ChatState] IDLE → SENDING (User sent message)
+script.js:101 [ChatState] UI sync: input/button DISABLED
+database.js:139 [DB] Saving message: {conversationId: '83aa317a-17d0-47a4-8137-459d06a3f374', role: 'user', contentLength: 17}
+script.js:52 [ChatState] SENDING → AWAITING_AI (Waiting for AI response)
+script.js:101 [ChatState] UI sync: input/button DISABLED
+database.js:162 [DB] Message saved successfully: af5ef18c-fb5e-4916-af0f-de848cdaa437
+database.js:168 [DB] Conversation timestamp updated
+script.js:52 [ChatState] AWAITING_AI → RENDERING (Rendering AI response)
+script.js:101 [ChatState] UI sync: input/button DISABLED
+script.js:585 [TypingEffect] Resolved
+database.js:139 [DB] Saving message: {conversationId: '83aa317a-17d0-47a4-8137-459d06a3f374', role: 'ai', contentLength: undefined}
+database.js:162 [DB] Message saved successfully: 6910400a-1f16-4a56-a58c-90f1c9865f82
+database.js:248 [DB] Getting message count for conversation: 83aa317a-17d0-47a4-8137-459d06a3f374
+script.js:52 [ChatState] RENDERING → IDLE (Message cycle complete)
+script.js:101 [ChatState] UI sync: input/button ENABLED
+script.js:904 [SendMessage] Cycle complete, state: {currentState: 'IDLE', recentHistory: Array(5), pendingBackgroundTasks: 0}
+database.js:260 [DB] Message count: 13
+database.js:168 [DB] Conversation timestamp updated
+script.js:958 [LoadConv] [load_8_1766163633597] START loading conversation: 1c051d48-4509-4e0e-b5f3-f2208f586888
+script.js:982 [LoadConv] [load_8_1766163633597] Calling getConversation...
+database.js:67 [DB] [req_15_1766163633598] getConversation START: 1c051d48-4509-4e0e-b5f3-f2208f586888 at 2025-12-19T17:00:33.598Z
+database.js:80 [DB] [req_15_1766163633598] getConversation RESPONSE: {hasData: true, error: null, status: 200, statusText: '', elapsedMs: 140}
+database.js:93 [DB] [req_15_1766163633598] getConversation END: 1c051d48-4509-4e0e-b5f3-f2208f586888 elapsed: 140ms
+script.js:984 [LoadConv] [load_8_1766163633597] getConversation returned successfully
+script.js:998 [LoadConv] [load_8_1766163633597] Calling loadMessages...
+database.js:178 [DB] [req_16_1766163633738] loadMessagesFromSupabase START: 1c051d48-4509-4e0e-b5f3-f2208f586888 at 2025-12-19T17:00:33.738Z
+database.js:191 [DB] [req_16_1766163633738] loadMessagesFromSupabase RESPONSE: {hasData: true, count: 6, error: null, status: 200, statusText: '', …}
+database.js:205 [DB] [req_16_1766163633738] loadMessagesFromSupabase END: 1c051d48-4509-4e0e-b5f3-f2208f586888 count: 6 elapsed: 139ms
+script.js:1000 [LoadConv] [load_8_1766163633597] loadMessages returned 6 messages
+script.js:1016 [LoadConv] [load_8_1766163633597] END - conversation loaded successfully
+script.js:958 [LoadConv] [load_9_1766163635362] START loading conversation: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7
+script.js:982 [LoadConv] [load_9_1766163635362] Calling getConversation...
+database.js:67 [DB] [req_17_1766163635363] getConversation START: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 at 2025-12-19T17:00:35.363Z
+database.js:80 [DB] [req_17_1766163635363] getConversation RESPONSE: {hasData: true, error: null, status: 200, statusText: '', elapsedMs: 117}
+database.js:93 [DB] [req_17_1766163635363] getConversation END: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 elapsed: 117ms
+script.js:984 [LoadConv] [load_9_1766163635362] getConversation returned successfully
+script.js:998 [LoadConv] [load_9_1766163635362] Calling loadMessages...
+database.js:178 [DB] [req_18_1766163635481] loadMessagesFromSupabase START: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 at 2025-12-19T17:00:35.481Z
+database.js:191 [DB] [req_18_1766163635481] loadMessagesFromSupabase RESPONSE: {hasData: true, count: 4, error: null, status: 200, statusText: '', …}
+database.js:205 [DB] [req_18_1766163635481] loadMessagesFromSupabase END: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 count: 4 elapsed: 106ms
+script.js:1000 [LoadConv] [load_9_1766163635362] loadMessages returned 4 messages
+script.js:1016 [LoadConv] [load_9_1766163635362] END - conversation loaded successfully
+script.js:958 [LoadConv] [load_10_1766163637236] START loading conversation: 83aa317a-17d0-47a4-8137-459d06a3f374
+script.js:982 [LoadConv] [load_10_1766163637236] Calling getConversation...
+database.js:67 [DB] [req_19_1766163637237] getConversation START: 83aa317a-17d0-47a4-8137-459d06a3f374 at 2025-12-19T17:00:37.237Z
+database.js:80 [DB] [req_19_1766163637237] getConversation RESPONSE: {hasData: true, error: null, status: 200, statusText: '', elapsedMs: 134}
+database.js:93 [DB] [req_19_1766163637237] getConversation END: 83aa317a-17d0-47a4-8137-459d06a3f374 elapsed: 134ms
+script.js:984 [LoadConv] [load_10_1766163637236] getConversation returned successfully
+script.js:998 [LoadConv] [load_10_1766163637236] Calling loadMessages...
+database.js:178 [DB] [req_20_1766163637372] loadMessagesFromSupabase START: 83aa317a-17d0-47a4-8137-459d06a3f374 at 2025-12-19T17:00:37.372Z
+database.js:191 [DB] [req_20_1766163637372] loadMessagesFromSupabase RESPONSE: {hasData: true, count: 13, error: null, status: 200, statusText: '', …}
+database.js:205 [DB] [req_20_1766163637372] loadMessagesFromSupabase END: 83aa317a-17d0-47a4-8137-459d06a3f374 count: 13 elapsed: 111ms
+script.js:1000 [LoadConv] [load_10_1766163637236] loadMessages returned 13 messages
+script.js:1016 [LoadConv] [load_10_1766163637236] END - conversation loaded successfully
+script.js:52 [ChatState] IDLE → SENDING (User sent message)
+script.js:101 [ChatState] UI sync: input/button DISABLED
+database.js:139 [DB] Saving message: {conversationId: '83aa317a-17d0-47a4-8137-459d06a3f374', role: 'user', contentLength: 40}
+script.js:52 [ChatState] SENDING → AWAITING_AI (Waiting for AI response)
+script.js:101 [ChatState] UI sync: input/button DISABLED
+database.js:162 [DB] Message saved successfully: fa3a2c69-9f04-4298-89a9-d4aa198fc426
+database.js:168 [DB] Conversation timestamp updated
+script.js:52 [ChatState] AWAITING_AI → RENDERING (Rendering AI response)
+script.js:101 [ChatState] UI sync: input/button DISABLED
+588647934_733219139819644_6110896234531929840_n.jpg:1  GET https://scontent.cdninstagram.com/v/t51.71878-15/588647934_733219139819644_6110896234531929840_n.jpg?stp=dst-jpegr_e15_p360x360_tt6&_nc_cat=110&ig_cache_key=Mzc4MzMyNTE4NTI3Mzc2NzQyOQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjY0MHgxMTM2Lmhkci5DMyJ9&_nc_ohc=7eFgh5HLY40Q7kNvwEdkGB5&_nc_oc=AdlbbU7Vp-jb8DmTUoT-BEfh4ZBlNwXxL7Z6XiyG8nCjIB981Cighq1OQDtjnpthk8k&_nc_ad=z-m&_nc_cid=1493&_nc_zt=23&se=-1&_nc_ht=scontent.cdninstagram.com&_nc_gid=eVc3yq2KOHNElPbwfKStGQ&oh=00_AfkL64GnD2JcgJ6WHUgKsU3KFVfijygucUios59QM-6ieA&oe=693DD702 403 (Forbidden)Understand this error
+597936056_18333343297213256_1103690397125222124_n.jpg:1  GET https://scontent.cdninstagram.com/v/t51.82787-15/597936056_18333343297213256_1103690397125222124_n.jpg?stp=dst-jpg_e35_p1080x1080_tt6&_nc_cat=101&ig_cache_key=Mzc4NDY2NjU5NTM5MDY3NDExMQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjEzNTB4MTY4Ny5zZHIuQzMifQ%3D%3D&_nc_ohc=-AHQdxZTM2wQ7kNvwHpo0GC&_nc_oc=Adl1zUKugIbFaUeuxjFPL6zvPPgcu0LrQuARBTCXGbRZfyEx3YFhrFbHT0rqsCFl4mM&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent.cdninstagram.com&_nc_gid=foHRYj0jChDJQRB3ZWsq8Q&oh=00_AfkI1vFdFREisX6lgX8KYowZXYhLLXxgKxHMYVttxhZ6_g&oe=69404EEB 403 (Forbidden)Understand this error
+script.js:585 [TypingEffect] Resolved
+database.js:139 [DB] Saving message: {conversationId: '83aa317a-17d0-47a4-8137-459d06a3f374', role: 'ai', contentLength: undefined}
+database.js:162 [DB] Message saved successfully: d69940e8-da11-452e-af81-2a9616728c9c
+database.js:248 [DB] Getting message count for conversation: 83aa317a-17d0-47a4-8137-459d06a3f374
+script.js:52 [ChatState] RENDERING → IDLE (Message cycle complete)
+script.js:101 [ChatState] UI sync: input/button ENABLED
+script.js:904 [SendMessage] Cycle complete, state: {currentState: 'IDLE', recentHistory: Array(5), pendingBackgroundTasks: 0}
+database.js:260 [DB] Message count: 15
+database.js:168 [DB] Conversation timestamp updated
+script.js:958 [LoadConv] [load_11_1766163744796] START loading conversation: 1c051d48-4509-4e0e-b5f3-f2208f586888
+script.js:982 [LoadConv] [load_11_1766163744796] Calling getConversation...
+database.js:67 [DB] [req_21_1766163744797] getConversation START: 1c051d48-4509-4e0e-b5f3-f2208f586888 at 2025-12-19T17:02:24.797Z
+database.js:80 [DB] [req_21_1766163744797] getConversation RESPONSE: {hasData: true, error: null, status: 200, statusText: '', elapsedMs: 336}
+database.js:93 [DB] [req_21_1766163744797] getConversation END: 1c051d48-4509-4e0e-b5f3-f2208f586888 elapsed: 336ms
+script.js:984 [LoadConv] [load_11_1766163744796] getConversation returned successfully
+script.js:998 [LoadConv] [load_11_1766163744796] Calling loadMessages...
+database.js:178 [DB] [req_22_1766163745134] loadMessagesFromSupabase START: 1c051d48-4509-4e0e-b5f3-f2208f586888 at 2025-12-19T17:02:25.134Z
+database.js:191 [DB] [req_22_1766163745134] loadMessagesFromSupabase RESPONSE: {hasData: true, count: 6, error: null, status: 200, statusText: '', …}
+database.js:205 [DB] [req_22_1766163745134] loadMessagesFromSupabase END: 1c051d48-4509-4e0e-b5f3-f2208f586888 count: 6 elapsed: 338ms
+script.js:1000 [LoadConv] [load_11_1766163744796] loadMessages returned 6 messages
+script.js:1016 [LoadConv] [load_11_1766163744796] END - conversation loaded successfully
+script.js:211 [Visibility] Tab visible, current state: IDLE
+script.js:101 [ChatState] UI sync: input/button ENABLED
+auth.js:20 [Auth] onAuthStateChange event: SIGNED_IN hasSession: true at 2025-12-19T17:02:42.697Z
+auth.js:24 [Auth] Session expires at: 2025-12-19T17:09:59.000Z
+script.js:958 [LoadConv] [load_12_1766163764780] START loading conversation: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7
+script.js:982 [LoadConv] [load_12_1766163764780] Calling getConversation...
+database.js:67 [DB] [req_23_1766163764780] getConversation START: d4c1bd4d-52ee-4bc5-8676-fd67f4643bd7 at 2025-12-19T17:02:44.780Z
+database.js:97 [DB] [req_23_1766163764780] getConversation EXCEPTION after 10002ms: Operation timed out
+getConversation @ database.js:97
+await in getConversation
+loadConversation @ script.js:983
+(anonymous) @ script.js:204
+(anonymous) @ utils.js:106
+setTimeout
+(anonymous) @ utils.js:105
+(anonymous) @ script.js:1074Understand this error
+script.js:1025 [LoadConv] [load_12_1766163764780] ERROR: Operation timed out
+loadConversation @ script.js:1025
+await in loadConversation
+(anonymous) @ script.js:204
+(anonymous) @ utils.js:106
+setTimeout
+(anonymous) @ utils.js:105
+(anonymous) @ script.js:1074Understand this error
+script.js:211 [Visibility] Tab visible, current state: IDLE
+script.js:101 [ChatState] UI sync: input/button ENABLED
