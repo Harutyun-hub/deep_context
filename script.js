@@ -4,6 +4,7 @@ let isInitialized = false;
 let chatDropdownListenerAttached = false;
 let isLoadingConversation = false;
 let pendingBackgroundTasks = 0;
+let currentLoadId = 0; // Unique ID for each load operation
 
 // Lifecycle management for cleanup
 let currentTypingInterval = null;
@@ -947,16 +948,19 @@ async function loadConversation(conversationId) {
         return;
     }
     
-    // Create new abort controller for this load
+    // Create new abort controller and unique load ID for this operation
     currentLoadAbortController = new AbortController();
+    currentLoadId++;
+    const thisLoadId = currentLoadId;
     isLoadingConversation = true;
     
     const messagesContainer = document.getElementById('messages');
     const previousConversationId = currentConversationId;
     
     // Add timeout for loading to prevent infinite loading state
+    // Only trigger if this is still the active load
     const loadTimeout = setTimeout(() => {
-        if (isLoadingConversation) {
+        if (isLoadingConversation && thisLoadId === currentLoadId) {
             console.warn('Load timeout - resetting loading state');
             isLoadingConversation = false;
             messagesContainer.innerHTML = '<div class="error-message">Loading timed out. Click to try again.</div>';
@@ -967,15 +971,15 @@ async function loadConversation(conversationId) {
         hideWelcomeMessage();
         messagesContainer.innerHTML = `<div style="text-align: center; padding: 40px;"><div class="loading-spinner"><img src="${NIMBUS_AVATAR_BASE64}" alt="Loading"></div></div>`;
         
-        // Check if aborted before making request
-        if (currentLoadAbortController?.signal.aborted) {
+        // Check if this load is still current before making request
+        if (thisLoadId !== currentLoadId || currentLoadAbortController?.signal.aborted) {
             throw new Error('Load cancelled');
         }
         
         const conversation = await getConversation(conversationId);
         
-        // Check if aborted after getting conversation
-        if (currentLoadAbortController?.signal.aborted) {
+        // Check if this load is still current after getting conversation
+        if (thisLoadId !== currentLoadId || currentLoadAbortController?.signal.aborted) {
             throw new Error('Load cancelled');
         }
         
@@ -988,8 +992,8 @@ async function loadConversation(conversationId) {
         
         const messages = await loadMessages();
         
-        // Check if aborted after loading messages
-        if (currentLoadAbortController?.signal.aborted) {
+        // Check if this load is still current after loading messages
+        if (thisLoadId !== currentLoadId || currentLoadAbortController?.signal.aborted) {
             throw new Error('Load cancelled');
         }
         
@@ -1004,17 +1008,25 @@ async function loadConversation(conversationId) {
         
     } catch (error) {
         if (error.message === 'Load cancelled') {
-            console.log('Conversation load was cancelled');
+            console.log('Conversation load was cancelled (load ID:', thisLoadId, ')');
+            // Don't reset state here - a newer load may be in progress
+            clearTimeout(loadTimeout);
             return;
         }
         console.error('Error loading conversation:', error);
-        messagesContainer.innerHTML = '<div class="error-message">Failed to load conversation. Click to try again.</div>';
-        showToast('Failed to load conversation', 'error');
-        currentConversationId = previousConversationId;
+        // Only show error if this is still the current load
+        if (thisLoadId === currentLoadId) {
+            messagesContainer.innerHTML = '<div class="error-message">Failed to load conversation. Click to try again.</div>';
+            showToast('Failed to load conversation', 'error');
+            currentConversationId = previousConversationId;
+        }
     } finally {
         clearTimeout(loadTimeout);
-        isLoadingConversation = false;
-        currentLoadAbortController = null;
+        // Only reset loading state if this is still the current load
+        if (thisLoadId === currentLoadId) {
+            isLoadingConversation = false;
+            currentLoadAbortController = null;
+        }
     }
 }
 
