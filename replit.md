@@ -119,6 +119,16 @@ The application is built with vanilla HTML, CSS, and JavaScript.
 - **Company Filtering**: Both dashboard and chat interface include company selectors for filtering data and providing context.
 - **Competitive Intelligence Suite**: 4-pillar strategic dashboard with Battlefield Overview (market share), Pulse of Engagement (trends), Creative Strategy (visual galleries), and Website Espionage (screenshot tracking). Supports client-vs-competitor comparison with dual company filters.
 
+## Logging Infrastructure
+- **Enterprise Logger**: `logger.js` provides a centralized `Logger` class with static methods:
+  - `Logger.info(message, context, meta)` - Blue-styled informational logs
+  - `Logger.warn(message, context, meta)` - Orange-styled warning logs
+  - `Logger.error(error, context, meta)` - Red-styled error logs with stack traces
+- **Console Output**: Distinctive color-coded formatting for easy visual identification
+- **Database Persistence**: Logs are persisted to `app_logs` Supabase table with user tracking
+- **Fail-Safe Design**: Supabase persistence failures are silent; console logging always works
+- **RLS Security**: Users can insert logs; only admins can read/delete logs
+
 ## External Dependencies
 - **Supabase**: For user authentication (Google OAuth), PostgreSQL database (users, conversations, messages tables), and Row Level Security.
 - **n8n**: Used as the AI backend, handling webhook endpoints for contextual AI responses and managing Redis for AI conversation memory.
