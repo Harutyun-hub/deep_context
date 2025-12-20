@@ -1,20 +1,51 @@
+// ============================================
+// GLOBAL ERROR BOUNDARY
+// Catches all unhandled errors and rejections
+// ============================================
+window.onerror = function(message, source, lineno, colno, error) {
+    Logger.error(error || new Error(message), 'GlobalError', {
+        source,
+        lineno,
+        colno,
+        type: 'uncaught_error'
+    });
+    return false;
+};
+
+window.onunhandledrejection = function(event) {
+    const error = event.reason instanceof Error 
+        ? event.reason 
+        : new Error(String(event.reason));
+    Logger.error(error, 'GlobalError', {
+        type: 'unhandled_rejection',
+        reason: String(event.reason)
+    });
+};
+
+// ============================================
+// APPLICATION STATE
+// ============================================
 let currentConversationId = null;
 let currentSessionId = null;
 let isInitialized = false;
 let chatDropdownListenerAttached = false;
 let isLoadingConversation = false;
 let pendingBackgroundTasks = 0;
-let currentLoadId = 0; // Unique ID for each load operation
+let currentLoadId = 0;
+let appLifecycleReady = false;
+
+const APP_CONTEXT = 'App';
+const CHAT_CONTEXT = 'Chat';
 
 // Lifecycle management for cleanup
 let currentTypingInterval = null;
 let currentLoadAbortController = null;
 let currentAIAbortController = null;
-const AI_FETCH_TIMEOUT_MS = 300000; // 5 minute timeout for AI responses
-const INPUT_UNLOCK_TIMEOUT_MS = 330000; // Safety timeout (5.5 min) - must be > AI timeout + typing timeout
-const TYPING_EFFECT_TIMEOUT_MS = 15000; // Max 15s for typing animation
+const AI_FETCH_TIMEOUT_MS = 300000;
+const INPUT_UNLOCK_TIMEOUT_MS = 330000;
+const TYPING_EFFECT_TIMEOUT_MS = 15000;
 
-const SAVE_TIMEOUT_MS = 15000; // Reduced from 30s
+const SAVE_TIMEOUT_MS = 15000;
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 1000;
 
@@ -49,14 +80,14 @@ const ChatStateMachine = {
             this.stateHistory.shift();
         }
         
-        console.log(`[ChatState] ${previousState} → ${newState}${reason ? ` (${reason})` : ''}`);
+        Logger.info(`${previousState} → ${newState}${reason ? ` (${reason})` : ''}`, 'ChatState');
         
         // Notify all listeners
         this.listeners.forEach(listener => {
             try {
                 listener(newState, previousState);
             } catch (err) {
-                console.error('[ChatState] Listener error:', err);
+                Logger.error(err, 'ChatState', { operation: 'listener' });
             }
         });
         
@@ -98,11 +129,11 @@ const ChatStateMachine = {
             input.focus();
         }
         
-        console.log(`[ChatState] UI sync: input/button ${shouldBeEnabled ? 'ENABLED' : 'DISABLED'}`);
+        Logger.info(`UI sync: input/button ${shouldBeEnabled ? 'ENABLED' : 'DISABLED'}`, 'ChatState');
     },
     
     forceReset(reason = 'Force reset') {
-        console.warn(`[ChatState] Force resetting state: ${reason}`);
+        Logger.warn(`Force resetting state: ${reason}`, 'ChatState');
         
         // Cleanup all pending operations
         cleanupTypingEffect();
@@ -178,7 +209,7 @@ function trackBackgroundTask(promise) {
     
     const wrappedPromise = withTimeout(promise, SAVE_TIMEOUT_MS)
         .catch(error => {
-            console.warn('Background task failed or timed out:', error.message);
+            Logger.warn(`Background task failed or timed out: ${error.message}`, APP_CONTEXT);
         });
     
     return wrappedPromise.finally(() => {
@@ -207,7 +238,7 @@ const debouncedLoadConversation = debounce((conversationId) => {
 // Page visibility change handler - mark auth as settling when returning to tab
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-        console.log('[Visibility] Tab visible, current state:', ChatStateMachine.getState());
+        Logger.info(`Tab visible, current state: ${ChatStateMachine.getState()}`, 'Visibility');
         // Mark auth as potentially settling - Supabase may refresh token
         if (typeof markAuthSettling === 'function') {
             markAuthSettling();
@@ -260,13 +291,13 @@ function cancelAIRequest() {
 
 // Force unlock input (safety mechanism) - now uses state machine
 function forceUnlockInput() {
-    console.log('[ForceUnlock] Forcing input unlock via state machine');
+    Logger.info('Forcing input unlock via state machine', 'ForceUnlock');
     ChatStateMachine.forceReset('Manual force unlock');
 }
 
 // Master cleanup function for logout/navigation
 function cleanupAllState() {
-    console.log('[Cleanup] Cleaning up all state');
+    Logger.info('Cleaning up all state', 'Cleanup');
     cleanupTypingEffect();
     cancelConversationLoad();
     cancelAIRequest();
@@ -311,18 +342,24 @@ async function saveMessage(role, content, conversationId = null, userId = null) 
     const uId = userId || (user ? user.id : null);
     
     if (!uId || !convId) {
-        console.error('No user or conversation');
+        Logger.error(new Error('No user or conversation'), CHAT_CONTEXT);
         return;
     }
     
     try {
-        await withRetry(
-            () => withTimeout(saveMessageToSupabase(convId, uId, role, content), SAVE_TIMEOUT_MS),
+        const result = await withRetry(
+            async () => {
+                const saveResult = await withTimeout(saveMessageToSupabase(convId, uId, role, content), SAVE_TIMEOUT_MS);
+                if (!saveResult.success) {
+                    throw new Error(saveResult.error?.message || 'Save failed');
+                }
+                return saveResult;
+            },
             MAX_RETRY_ATTEMPTS,
             RETRY_DELAY_MS
         );
     } catch (error) {
-        console.error('Failed to save message after retries:', error);
+        Logger.error(error, CHAT_CONTEXT, { operation: 'saveMessage' });
     }
 }
 
@@ -332,10 +369,14 @@ async function loadMessages() {
     }
     
     try {
-        const messages = await loadMessagesFromSupabase(currentConversationId);
-        return messages;
+        const result = await loadMessagesFromSupabase(currentConversationId);
+        if (!result.success) {
+            Logger.error(new Error(result.error?.message || 'Failed to load messages'), CHAT_CONTEXT);
+            return [];
+        }
+        return result.data;
     } catch (error) {
-        console.error('Failed to load messages:', error);
+        Logger.error(error, CHAT_CONTEXT, { operation: 'loadMessages' });
         return [];
     }
 }
@@ -568,7 +609,7 @@ function copyMessageText(contentDiv, copyBtn) {
             copyBtn.classList.remove('copied');
         }, 2000);
     }).catch(err => {
-        console.error('Failed to copy text:', err);
+        Logger.error(err, CHAT_CONTEXT, { operation: 'copyMessageText' });
     });
 }
 
@@ -585,13 +626,13 @@ function showTypingEffect(content, contentDiv) {
                 typingTimeout = null;
             }
             cleanupTypingEffect();
-            console.log('[TypingEffect] Resolved');
+            Logger.info('Resolved', 'TypingEffect');
             resolve();
         };
         
         // GUARANTEED RESOLUTION: Max 15 seconds for typing effect
         typingTimeout = setTimeout(() => {
-            console.warn('[TypingEffect] Timeout - forcing completion');
+            Logger.warn('Timeout - forcing completion', 'TypingEffect');
             // Show remaining content immediately
             try {
                 const renderedContent = renderMessage(content);
@@ -685,13 +726,13 @@ function showTypingEffect(content, contentDiv) {
                         safeResolve();
                     }
                 } catch (err) {
-                    console.error('[TypingEffect] Error:', err);
+                    Logger.error(err, 'TypingEffect', { operation: 'animation' });
                     cursor.remove();
                     safeResolve();
                 }
             }, 60);
         } catch (err) {
-            console.error('[TypingEffect] Failed to render:', err);
+            Logger.error(err, 'TypingEffect', { operation: 'render' });
             // Fallback: just show the content without animation
             contentDiv.textContent = typeof content === 'string' ? content : JSON.stringify(content);
             safeResolve();
@@ -765,7 +806,7 @@ async function getAIResponse(userMessage, sessionId, userId) {
         const text = await response.text();
         
         if (!text || text.trim() === '') {
-            console.warn('Empty response from webhook');
+            Logger.warn('Empty response from webhook', CHAT_CONTEXT);
             throw new Error('Empty response from server');
         }
         
@@ -786,10 +827,10 @@ async function getAIResponse(userMessage, sessionId, userId) {
         }
         
         if (error.name === 'AbortError') {
-            console.log('AI request was cancelled');
+            Logger.info('AI request was cancelled', CHAT_CONTEXT);
             throw new Error('Request was cancelled');
         }
-        console.error('Error fetching AI response:', error);
+        Logger.error(error, CHAT_CONTEXT, { operation: 'getAIResponse' });
         throw error;
     } finally {
         // Only clear global if this is still the current controller
@@ -807,7 +848,7 @@ async function handleSendMessage() {
     
     // Check if we can send (state machine controls this)
     if (!ChatStateMachine.canSendMessage()) {
-        console.warn('[SendMessage] Cannot send - chat not in IDLE state:', ChatStateMachine.getState());
+        Logger.warn(`Cannot send - chat not in IDLE state: ${ChatStateMachine.getState()}`, 'SendMessage');
         return;
     }
     
@@ -838,7 +879,7 @@ async function handleSendMessage() {
         
         // Save user message (don't await, let it run in background with timeout)
         const userSavePromise = saveMessage('user', userMessage, convIdAtSend, userIdAtSend).catch(error => {
-            console.error('[SendMessage] Failed to save user message:', error);
+            Logger.error(error, 'SendMessage', { operation: 'saveUserMessage' });
             showToast('Failed to save message', 'error');
             return null;
         });
@@ -869,7 +910,7 @@ async function handleSendMessage() {
             
             // Save AI message (don't block on this)
             const aiSavePromise = saveMessage('ai', aiResponse, convIdAtSend, userIdAtSend).catch(error => {
-                console.error('[SendMessage] Failed to save AI message:', error);
+                Logger.error(error, 'SendMessage', { operation: 'saveAIMessage' });
                 return null;
             });
             
@@ -881,13 +922,13 @@ async function handleSendMessage() {
             
             // Update title in background (non-blocking)
             updateConversationTitleIfNeeded(convIdAtSend, titleForConv).catch(err => {
-                console.warn('[SendMessage] Title update failed:', err);
+                Logger.warn(`Title update failed: ${err.message}`, 'SendMessage');
             });
             
         } catch (error) {
             typingMessage.remove();
             cleanupTypingEffect();
-            console.error('[SendMessage] AI response error:', error);
+            Logger.error(error, 'SendMessage', { operation: 'aiResponse' });
             
             ChatStateMachine.setState(ChatState.ERROR, 'AI response failed');
             
@@ -904,40 +945,48 @@ async function handleSendMessage() {
     } finally {
         // ALWAYS return to IDLE state - this guarantees input is unlocked
         ChatStateMachine.setState(ChatState.IDLE, 'Message cycle complete');
-        console.log('[SendMessage] Cycle complete, state:', ChatStateMachine.getDebugInfo());
+        Logger.info('Cycle complete', 'SendMessage', { state: ChatStateMachine.getDebugInfo() });
     }
 }
 
 async function createNewConversation() {
     const user = getCurrentUser();
     if (!user) {
-        console.error('No user logged in');
+        Logger.error(new Error('No user logged in'), CHAT_CONTEXT);
         return null;
     }
     
     try {
         currentSessionId = generateUUID();
-        const conversation = await createConversation(user.id, null, currentSessionId);
-        currentConversationId = conversation.id;
-        return conversation;
+        const result = await createConversation(user.id, null, currentSessionId);
+        if (!result.success) {
+            Logger.error(new Error(result.error?.message || 'Failed to create conversation'), CHAT_CONTEXT);
+            return null;
+        }
+        currentConversationId = result.data.id;
+        return result.data;
     } catch (error) {
-        console.error('Error creating conversation:', error);
+        Logger.error(error, CHAT_CONTEXT, { operation: 'createNewConversation' });
         return null;
     }
 }
 
 async function updateConversationTitleIfNeeded(conversationId, title) {
     try {
-        const messageCount = await withTimeout(getMessageCount(conversationId), 10000);
+        const countResult = await withTimeout(getMessageCount(conversationId), 10000);
+        const messageCount = countResult.success ? countResult.data : 0;
+        
         if (messageCount === 2) {
-            await withTimeout(updateConversationTitle(conversationId, title), 10000);
-            const updated = updateSidebarTitleLocally(conversationId, title);
-            if (!updated) {
-                loadConversationHistory().catch(() => {});
+            const updateResult = await withTimeout(updateConversationTitle(conversationId, title), 10000);
+            if (updateResult.success) {
+                const updated = updateSidebarTitleLocally(conversationId, title);
+                if (!updated) {
+                    loadConversationHistory().catch(() => {});
+                }
             }
         }
     } catch (error) {
-        console.warn('Title update skipped:', error.message);
+        Logger.warn(`Title update skipped: ${error.message}`, CHAT_CONTEXT);
     }
 }
 
@@ -947,7 +996,7 @@ async function loadConversation(conversationId) {
     
     // If already loading the same conversation, skip
     if (isLoadingConversation && conversationId === currentConversationId) {
-        console.log('[LoadConv] Already loading this conversation, skipping...');
+        Logger.info('Already loading this conversation, skipping...', 'LoadConv');
         return;
     }
     
@@ -958,7 +1007,7 @@ async function loadConversation(conversationId) {
     const loadRequestId = `load_${thisLoadId}_${Date.now()}`;
     isLoadingConversation = true;
     
-    console.log(`[LoadConv] [${loadRequestId}] START loading conversation:`, conversationId);
+    Logger.info(`START loading conversation: ${conversationId}`, 'LoadConv', { loadRequestId });
     
     // Wait for auth to settle if needed (after visibility change)
     if (typeof waitForAuthReady === 'function') {
@@ -969,7 +1018,7 @@ async function loadConversation(conversationId) {
     if (typeof ensureValidSession === 'function') {
         const session = await ensureValidSession();
         if (!session) {
-            console.error(`[LoadConv] [${loadRequestId}] No valid session, aborting load`);
+            Logger.error(new Error('No valid session, aborting load'), 'LoadConv', { loadRequestId });
             isLoadingConversation = false;
             return;
         }
@@ -982,7 +1031,7 @@ async function loadConversation(conversationId) {
     // Only trigger if this is still the active load
     const loadTimeout = setTimeout(() => {
         if (isLoadingConversation && thisLoadId === currentLoadId) {
-            console.warn('Load timeout - resetting loading state');
+            Logger.warn('Load timeout - resetting loading state', 'LoadConv');
             isLoadingConversation = false;
             messagesContainer.innerHTML = '<div class="error-message">Loading timed out. Click to try again.</div>';
         }
@@ -997,9 +1046,15 @@ async function loadConversation(conversationId) {
             throw new Error('Load cancelled');
         }
         
-        console.log(`[LoadConv] [${loadRequestId}] Calling getConversation...`);
-        const conversation = await getConversation(conversationId);
-        console.log(`[LoadConv] [${loadRequestId}] getConversation returned successfully`);
+        Logger.info(`Calling getConversation...`, CHAT_CONTEXT, { loadRequestId });
+        const result = await getConversation(conversationId);
+        
+        if (!result.success) {
+            throw new Error(result.error?.message || 'Failed to load conversation');
+        }
+        
+        const conversation = result.data;
+        Logger.info(`getConversation returned successfully`, CHAT_CONTEXT, { loadRequestId });
         
         // Check if this load is still current after getting conversation
         if (thisLoadId !== currentLoadId || currentLoadAbortController?.signal.aborted) {
@@ -1013,9 +1068,9 @@ async function loadConversation(conversationId) {
         
         messagesContainer.innerHTML = '';
         
-        console.log(`[LoadConv] [${loadRequestId}] Calling loadMessages...`);
+        Logger.info(`Calling loadMessages...`, 'LoadConv', { loadRequestId });
         const messages = await loadMessages();
-        console.log(`[LoadConv] [${loadRequestId}] loadMessages returned`, messages.length, 'messages');
+        Logger.info(`loadMessages returned ${messages.length} messages`, 'LoadConv', { loadRequestId });
         
         // Check if this load is still current after loading messages
         if (thisLoadId !== currentLoadId || currentLoadAbortController?.signal.aborted) {
@@ -1031,16 +1086,16 @@ async function loadConversation(conversationId) {
             });
         }
         
-        console.log(`[LoadConv] [${loadRequestId}] END - conversation loaded successfully`);
+        Logger.info(`END - conversation loaded successfully`, 'LoadConv', { loadRequestId });
         
     } catch (error) {
         if (error.message === 'Load cancelled') {
-            console.log(`[LoadConv] [${loadRequestId}] Cancelled (load ID: ${thisLoadId})`);
+            Logger.info(`Cancelled (load ID: ${thisLoadId})`, 'LoadConv', { loadRequestId });
             // Don't reset state here - a newer load may be in progress
             clearTimeout(loadTimeout);
             return;
         }
-        console.error(`[LoadConv] [${loadRequestId}] ERROR:`, error.message);
+        Logger.error(error, 'LoadConv', { loadRequestId });
         // Only show error if this is still the current load
         if (thisLoadId === currentLoadId) {
             messagesContainer.innerHTML = '<div class="error-message">Failed to load conversation. Click to try again.</div>';
@@ -1066,8 +1121,14 @@ async function loadConversationHistory() {
     try {
         historyContainer.innerHTML = '<div style="padding: 16px; text-align: center;"><div class="spinner"></div></div>';
         
-        const conversations = await getUserConversations(user.id);
+        const result = await getUserConversations(user.id);
         historyContainer.innerHTML = '';
+        
+        if (!result.success) {
+            throw new Error(result.error?.message || 'Failed to load conversations');
+        }
+        
+        const conversations = result.data;
         
         if (conversations.length === 0) {
             historyContainer.innerHTML = '<div style="padding: 16px; text-align: center; color: #9aa0a6; font-size: 13px;">No conversations yet</div>';
@@ -1158,7 +1219,7 @@ async function loadConversationHistory() {
         
         return conversations;
     } catch (error) {
-        console.error('Error loading conversation history:', error);
+        Logger.error(error, CHAT_CONTEXT, { operation: 'loadConversationHistory' });
         historyContainer.innerHTML = '<div class="error-message" style="margin: 10px; font-size: 12px;">Failed to load history</div>';
         return [];
     }
@@ -1193,11 +1254,15 @@ async function handleRenameConversation(conversationId, currentTitle) {
         const newTitle = prompt('Enter new name for this chat:', currentTitle);
         if (newTitle === null || newTitle.trim() === '') return;
         
-        await updateConversationTitle(conversationId, newTitle.trim());
+        const result = await updateConversationTitle(conversationId, newTitle.trim());
+        if (!result.success) {
+            throw new Error(result.error?.message || 'Failed to rename conversation');
+        }
+        
         await loadConversationHistory();
         showToast('Chat renamed successfully', 'success');
     } catch (error) {
-        console.error('Error renaming conversation:', error);
+        Logger.error(error, CHAT_CONTEXT, { operation: 'handleRenameConversation' });
         showToast('Failed to rename chat', 'error');
     }
 }
@@ -1210,7 +1275,10 @@ async function handleDeleteConversation(conversationId) {
         document.querySelectorAll('.chat-item-dropdown').forEach(d => d.classList.remove('show'));
         document.querySelectorAll('.chat-item-menu-btn').forEach(b => b.classList.remove('active'));
         
-        await deleteConversation(conversationId);
+        const result = await deleteConversation(conversationId);
+        if (!result.success) {
+            throw new Error(result.error?.message || 'Failed to delete conversation');
+        }
         
         if (conversationId === currentConversationId) {
             currentConversationId = null;
@@ -1221,7 +1289,7 @@ async function handleDeleteConversation(conversationId) {
         await loadConversationHistory();
         showToast('Conversation deleted successfully', 'success');
     } catch (error) {
-        console.error('Error deleting conversation:', error);
+        Logger.error(error, CHAT_CONTEXT, { operation: 'handleDeleteConversation' });
         showToast('Failed to delete conversation', 'error');
     }
 }
@@ -1256,26 +1324,26 @@ function hideWelcomeMessage() {
 
 async function handleNewChatClick(e) {
     e.preventDefault();
-    console.log('[NewChat] Button clicked');
+    Logger.info('Button clicked', 'NewChat');
     try {
         const messagesContainer = document.getElementById('messages');
         messagesContainer.innerHTML = '';
         
         showWelcomeMessage();
         
-        console.log('[NewChat] Creating new conversation...');
+        Logger.info('Creating new conversation...', 'NewChat');
         const result = await createNewConversation();
-        console.log('[NewChat] createNewConversation result:', result, 'currentConversationId:', currentConversationId);
+        Logger.info(`createNewConversation result, currentConversationId: ${currentConversationId}`, 'NewChat', { result });
         
         if (currentConversationId) {
-            console.log('[NewChat] Loading conversation history...');
+            Logger.info('Loading conversation history...', 'NewChat');
             await loadConversationHistory();
-            console.log('[NewChat] Conversation history loaded');
+            Logger.info('Conversation history loaded', 'NewChat');
         } else {
             throw new Error('Failed to create new conversation');
         }
     } catch (error) {
-        console.error('[NewChat] Error:', error);
+        Logger.error(error, 'NewChat');
         handleError(error, 'Create new chat');
     }
 }
@@ -1297,7 +1365,7 @@ async function populateChatCompanyFilter() {
             .order('company_key', { ascending: true });
         
         if (error) {
-            console.error('Error loading companies for chat:', error);
+            Logger.error(error, CHAT_CONTEXT, { operation: 'populateChatCompanyFilter' });
             return;
         }
         
@@ -1335,7 +1403,7 @@ async function populateChatCompanyFilter() {
         }
         
     } catch (error) {
-        console.error('Error populating chat company filter:', error);
+        Logger.error(error, CHAT_CONTEXT, { operation: 'populateChatCompanyFilter' });
     }
 }
 
@@ -1349,20 +1417,26 @@ window.getChatCompanyLogo = getChatCompanyLogo;
 
 async function initializeChat() {
     if (isInitialized) {
+        Logger.info('Chat already initialized, skipping', CHAT_CONTEXT);
         return;
     }
+    
+    Logger.info('Initializing chat module...', CHAT_CONTEXT);
     
     const user = getCurrentUser();
     if (!user) {
-        console.error('User not authenticated');
+        Logger.error(new Error('User not authenticated'), CHAT_CONTEXT);
         return;
     }
     
+    Logger.info('User authenticated, loading chat data...', CHAT_CONTEXT, { userId: user.id });
     
     try {
         await populateChatCompanyFilter();
+        Logger.info('Company filter populated', CHAT_CONTEXT);
         
         const conversations = await loadConversationHistory();
+        Logger.info(`Loaded ${conversations.length} conversations`, CHAT_CONTEXT);
         
         if (conversations.length > 0) {
             await loadConversation(conversations[0].id);
@@ -1371,7 +1445,7 @@ async function initializeChat() {
             showWelcomeMessage();
         }
     } catch (error) {
-        console.error('Error during chat initialization:', error);
+        Logger.error(error, CHAT_CONTEXT, { operation: 'initializeChat' });
         showToast('Failed to load chat. Please refresh the page.', 'error');
         return;
     }
@@ -1389,8 +1463,80 @@ async function initializeChat() {
         newChatBtn.removeEventListener('click', handleNewChatClick);
         newChatBtn.addEventListener('click', handleNewChatClick);
     } else {
-        console.error('New chat button not found');
+        Logger.warn('New chat button not found', CHAT_CONTEXT);
     }
     
     isInitialized = true;
+    Logger.info('Chat initialization complete', CHAT_CONTEXT);
+}
+
+// ============================================
+// LIFECYCLE MANAGER
+// Ensures proper initialization order
+// ============================================
+const Chat = {
+    initialize: initializeChat,
+    isInitialized: () => isInitialized
+};
+
+async function initApp() {
+    Logger.info('Application lifecycle starting...', APP_CONTEXT);
+    
+    // Step 1: DOM is already ready (called from DOMContentLoaded)
+    Logger.info('Step 1: DOM ready', APP_CONTEXT);
+    
+    // Step 2: Initialize authentication and wait for it
+    Logger.info('Step 2: Initializing authentication...', APP_CONTEXT);
+    
+    try {
+        // Use the Auth interface for initialization
+        const session = await Auth.initialize();
+        
+        // Get user from Auth interface after initialization is complete
+        const user = Auth.getCurrentUser();
+        
+        if (!session && !user) {
+            Logger.warn('No active session found', APP_CONTEXT);
+            if (!window.location.pathname.includes('login.html')) {
+                Logger.info('Redirecting to login page...', APP_CONTEXT);
+                window.location.href = '/login.html';
+                return;
+            }
+            return;
+        }
+        
+        Logger.info('Authentication confirmed', APP_CONTEXT, { 
+            userId: user?.id,
+            email: user?.email 
+        });
+        
+        // Step 3: Initialize chat ONLY after auth is confirmed
+        Logger.info('Step 3: Initializing chat module...', APP_CONTEXT);
+        await Chat.initialize();
+        
+        appLifecycleReady = true;
+        Logger.info('Application lifecycle complete - app is ready', APP_CONTEXT);
+        
+    } catch (error) {
+        Logger.error(error, APP_CONTEXT, { operation: 'initApp' });
+        showToast('Failed to initialize application. Please refresh the page.', 'error');
+    }
+}
+
+// Start the application lifecycle when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        Logger.info('DOMContentLoaded event fired', APP_CONTEXT);
+        initApp();
+    });
+} else {
+    Logger.info('DOM already ready, starting app...', APP_CONTEXT);
+    initApp();
+}
+
+// Export for external access
+if (typeof window !== 'undefined') {
+    window.initApp = initApp;
+    window.Chat = Chat;
+    window.isAppReady = () => appLifecycleReady;
 }

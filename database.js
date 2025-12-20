@@ -1,3 +1,4 @@
+const DB_CONTEXT = 'Database';
 let dbRequestCounter = 0;
 
 function generateRequestId() {
@@ -17,56 +18,91 @@ function withTimeout(promise, timeoutMs, requestId, operationName) {
     });
 }
 
+function createSuccessResult(data) {
+    return { success: true, data, error: null };
+}
+
+function createErrorResult(error) {
+    const errorMessage = error?.message || String(error);
+    return { 
+        success: false, 
+        data: null, 
+        error: {
+            message: errorMessage,
+            code: error?.code || 'UNKNOWN',
+            details: error?.details || null
+        }
+    };
+}
+
 async function createConversation(userId, title = null, sessionId = null) {
-    const supabase = getSupabase();
-    console.log('[DB] Creating conversation for user:', userId);
+    const requestId = generateRequestId();
+    Logger.info(`Creating conversation for user: ${userId}`, DB_CONTEXT, { requestId });
     
-    const { data, error } = await supabase
-        .from('conversations')
-        .insert([{
-            user_id: userId,
-            title: title,
-            session_id: sessionId
-        }])
-        .select()
-        .single();
-    
-    if (error) {
-        console.error('[DB] Error creating conversation:', error);
-        throw error;
+    try {
+        const supabase = getSupabase();
+        
+        const { data, error } = await supabase
+            .from('conversations')
+            .insert([{
+                user_id: userId,
+                title: title,
+                session_id: sessionId
+            }])
+            .select()
+            .single();
+        
+        if (error) {
+            Logger.error(error, DB_CONTEXT, { operation: 'createConversation', requestId, userId });
+            return createErrorResult(error);
+        }
+        
+        Logger.info(`Conversation created: ${data.id}`, DB_CONTEXT, { requestId });
+        return createSuccessResult(data);
+        
+    } catch (err) {
+        Logger.error(err, DB_CONTEXT, { operation: 'createConversation', requestId, userId });
+        return createErrorResult(err);
     }
-    
-    console.log('[DB] Conversation created:', data.id);
-    return data;
 }
 
 async function getUserConversations(userId, limit = 50) {
-    const supabase = getSupabase();
-    console.log('[DB] getUserConversations START:', userId, 'at', new Date().toISOString());
+    const requestId = generateRequestId();
+    Logger.info(`Getting conversations for user: ${userId}`, DB_CONTEXT, { requestId, limit });
     
-    const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false })
-        .limit(limit);
-    
-    if (error) {
-        console.error('[DB] getUserConversations ERROR:', error, 'at', new Date().toISOString());
-        throw error;
+    try {
+        const supabase = getSupabase();
+        
+        const { data, error } = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('user_id', userId)
+            .order('updated_at', { ascending: false })
+            .limit(limit);
+        
+        if (error) {
+            Logger.error(error, DB_CONTEXT, { operation: 'getUserConversations', requestId, userId });
+            return createErrorResult(error);
+        }
+        
+        const conversations = data || [];
+        Logger.info(`Retrieved ${conversations.length} conversations`, DB_CONTEXT, { requestId });
+        return createSuccessResult(conversations);
+        
+    } catch (err) {
+        Logger.error(err, DB_CONTEXT, { operation: 'getUserConversations', requestId, userId });
+        return createErrorResult(err);
     }
-    
-    console.log('[DB] getUserConversations END:', userId, 'count:', (data || []).length, 'at', new Date().toISOString());
-    return data || [];
 }
 
 async function getConversation(conversationId) {
-    const supabase = getSupabase();
     const requestId = generateRequestId();
     const startTime = Date.now();
-    console.log(`[DB] [${requestId}] getConversation START:`, conversationId, 'at', new Date().toISOString());
+    Logger.info(`Getting conversation: ${conversationId}`, DB_CONTEXT, { requestId });
     
     try {
+        const supabase = getSupabase();
+        
         const queryPromise = supabase
             .from('conversations')
             .select('*')
@@ -77,107 +113,143 @@ async function getConversation(conversationId) {
         const { data, error, status, statusText } = result;
         const elapsed = Date.now() - startTime;
         
-        console.log(`[DB] [${requestId}] getConversation RESPONSE:`, {
+        Logger.info(`getConversation response`, DB_CONTEXT, {
+            requestId,
             hasData: !!data,
-            error: error,
-            status: status,
-            statusText: statusText,
+            status,
+            statusText,
             elapsedMs: elapsed
         });
         
         if (error) {
-            console.error(`[DB] [${requestId}] getConversation ERROR:`, error, 'at', new Date().toISOString());
-            throw error;
+            Logger.error(error, DB_CONTEXT, { operation: 'getConversation', requestId, conversationId });
+            return createErrorResult(error);
         }
         
-        console.log(`[DB] [${requestId}] getConversation END:`, conversationId, 'elapsed:', elapsed + 'ms');
-        return data;
+        return createSuccessResult(data);
+        
     } catch (err) {
         const elapsed = Date.now() - startTime;
-        console.error(`[DB] [${requestId}] getConversation EXCEPTION after ${elapsed}ms:`, err.message);
-        throw err;
+        Logger.error(err, DB_CONTEXT, { operation: 'getConversation', requestId, conversationId, elapsedMs: elapsed });
+        return createErrorResult(err);
     }
 }
 
 async function updateConversationTitle(conversationId, title) {
-    const supabase = getSupabase();
-    console.log('[DB] Updating conversation title:', { conversationId, title });
+    const requestId = generateRequestId();
+    Logger.info(`Updating conversation title`, DB_CONTEXT, { requestId, conversationId, title });
     
-    const { data, error } = await supabase
-        .from('conversations')
-        .update({ title: title })
-        .eq('id', conversationId)
-        .select()
-        .single();
-    
-    if (error) {
-        console.error('[DB] Error updating conversation title:', error);
-        throw error;
+    try {
+        const supabase = getSupabase();
+        
+        const { data, error } = await supabase
+            .from('conversations')
+            .update({ title: title })
+            .eq('id', conversationId)
+            .select()
+            .single();
+        
+        if (error) {
+            Logger.error(error, DB_CONTEXT, { operation: 'updateConversationTitle', requestId, conversationId });
+            return createErrorResult(error);
+        }
+        
+        Logger.info('Title updated successfully', DB_CONTEXT, { requestId });
+        return createSuccessResult(data);
+        
+    } catch (err) {
+        Logger.error(err, DB_CONTEXT, { operation: 'updateConversationTitle', requestId, conversationId });
+        return createErrorResult(err);
     }
-    
-    console.log('[DB] Title updated successfully');
-    return data;
 }
 
 async function deleteConversation(conversationId) {
-    const supabase = getSupabase();
+    const requestId = generateRequestId();
+    Logger.info(`Deleting conversation: ${conversationId}`, DB_CONTEXT, { requestId });
     
-    const { error } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('id', conversationId);
-    
-    if (error) {
-        console.error('Error deleting conversation:', error);
-        throw error;
+    try {
+        const supabase = getSupabase();
+        
+        const { error } = await supabase
+            .from('conversations')
+            .delete()
+            .eq('id', conversationId);
+        
+        if (error) {
+            Logger.error(error, DB_CONTEXT, { operation: 'deleteConversation', requestId, conversationId });
+            return createErrorResult(error);
+        }
+        
+        Logger.info('Conversation deleted successfully', DB_CONTEXT, { requestId });
+        return createSuccessResult(true);
+        
+    } catch (err) {
+        Logger.error(err, DB_CONTEXT, { operation: 'deleteConversation', requestId, conversationId });
+        return createErrorResult(err);
     }
-    
 }
 
 async function saveMessageToSupabase(conversationId, userId, role, content) {
-    const supabase = getSupabase();
-    console.log('[DB] Saving message:', { conversationId, role, contentLength: content?.length });
+    const requestId = generateRequestId();
+    Logger.info(`Saving message`, DB_CONTEXT, { 
+        requestId, 
+        conversationId, 
+        role, 
+        contentLength: content?.length 
+    });
     
-    let contentToSave = content;
-    if (typeof content === 'object' && content !== null) {
-        contentToSave = JSON.stringify(content);
+    try {
+        const supabase = getSupabase();
+        
+        let contentToSave = content;
+        if (typeof content === 'object' && content !== null) {
+            contentToSave = JSON.stringify(content);
+        }
+        
+        const { data, error } = await supabase
+            .from('messages')
+            .insert([{
+                conversation_id: conversationId,
+                user_id: userId,
+                role: role,
+                content: contentToSave
+            }])
+            .select()
+            .single();
+        
+        if (error) {
+            Logger.error(error, DB_CONTEXT, { operation: 'saveMessageToSupabase', requestId, conversationId });
+            return createErrorResult(error);
+        }
+        
+        Logger.info(`Message saved: ${data.id}`, DB_CONTEXT, { requestId });
+        
+        supabase
+            .from('conversations')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', conversationId)
+            .then(() => Logger.info('Conversation timestamp updated', DB_CONTEXT, { requestId }))
+            .catch(err => Logger.warn('Failed to update conversation timestamp', DB_CONTEXT, { 
+                requestId, 
+                error: err.message 
+            }));
+        
+        return createSuccessResult(data);
+        
+    } catch (err) {
+        Logger.error(err, DB_CONTEXT, { operation: 'saveMessageToSupabase', requestId, conversationId });
+        return createErrorResult(err);
     }
-    
-    const { data, error } = await supabase
-        .from('messages')
-        .insert([{
-            conversation_id: conversationId,
-            user_id: userId,
-            role: role,
-            content: contentToSave
-        }])
-        .select()
-        .single();
-    
-    if (error) {
-        console.error('[DB] Error saving message:', error);
-        throw error;
-    }
-    
-    console.log('[DB] Message saved successfully:', data.id);
-    
-    supabase
-        .from('conversations')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', conversationId)
-        .then(() => console.log('[DB] Conversation timestamp updated'))
-        .catch(err => console.error('[DB] Error updating conversation timestamp:', err));
-    
-    return data;
 }
 
 async function loadMessagesFromSupabase(conversationId) {
-    const supabase = getSupabase();
     const requestId = generateRequestId();
     const startTime = Date.now();
-    console.log(`[DB] [${requestId}] loadMessagesFromSupabase START:`, conversationId, 'at', new Date().toISOString());
+    Logger.info(`Loading messages for conversation: ${conversationId}`, DB_CONTEXT, { requestId });
     
     try {
+        const supabase = getSupabase();
+        
         const queryPromise = supabase
             .from('messages')
             .select('*')
@@ -188,31 +260,28 @@ async function loadMessagesFromSupabase(conversationId) {
         const { data, error, status, statusText } = result;
         const elapsed = Date.now() - startTime;
         
-        console.log(`[DB] [${requestId}] loadMessagesFromSupabase RESPONSE:`, {
+        Logger.info(`loadMessagesFromSupabase response`, DB_CONTEXT, {
+            requestId,
             hasData: !!data,
             count: (data || []).length,
-            error: error,
-            status: status,
-            statusText: statusText,
+            status,
+            statusText,
             elapsedMs: elapsed
         });
         
         if (error) {
-            console.error(`[DB] [${requestId}] loadMessagesFromSupabase ERROR:`, error, 'at', new Date().toISOString());
-            throw error;
+            Logger.error(error, DB_CONTEXT, { operation: 'loadMessagesFromSupabase', requestId, conversationId });
+            return createErrorResult(error);
         }
         
-        console.log(`[DB] [${requestId}] loadMessagesFromSupabase END:`, conversationId, 'count:', (data || []).length, 'elapsed:', elapsed + 'ms');
-        const messages = data || [];
-        
-        return messages.map(msg => {
+        const messages = (data || []).map(msg => {
             let content = msg.content;
             
             if (typeof content === 'string' && content.trim().startsWith('{')) {
                 try {
                     content = JSON.parse(content);
                 } catch (e) {
-                    console.warn('Failed to parse message content as JSON:', e);
+                    Logger.warn('Failed to parse message content as JSON', DB_CONTEXT, { requestId, messageId: msg.id });
                 }
             }
             
@@ -221,42 +290,64 @@ async function loadMessagesFromSupabase(conversationId) {
                 content: content
             };
         });
+        
+        return createSuccessResult(messages);
+        
     } catch (err) {
         const elapsed = Date.now() - startTime;
-        console.error(`[DB] [${requestId}] loadMessagesFromSupabase EXCEPTION after ${elapsed}ms:`, err.message);
-        throw err;
+        Logger.error(err, DB_CONTEXT, { operation: 'loadMessagesFromSupabase', requestId, conversationId, elapsedMs: elapsed });
+        return createErrorResult(err);
     }
 }
 
 async function deleteAllUserConversations(userId) {
-    const supabase = getSupabase();
+    const requestId = generateRequestId();
+    Logger.info(`Deleting all conversations for user: ${userId}`, DB_CONTEXT, { requestId });
     
-    const { error } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('user_id', userId);
-    
-    if (error) {
-        console.error('Error deleting all conversations:', error);
-        throw error;
+    try {
+        const supabase = getSupabase();
+        
+        const { error } = await supabase
+            .from('conversations')
+            .delete()
+            .eq('user_id', userId);
+        
+        if (error) {
+            Logger.error(error, DB_CONTEXT, { operation: 'deleteAllUserConversations', requestId, userId });
+            return createErrorResult(error);
+        }
+        
+        Logger.info('All user conversations deleted', DB_CONTEXT, { requestId });
+        return createSuccessResult(true);
+        
+    } catch (err) {
+        Logger.error(err, DB_CONTEXT, { operation: 'deleteAllUserConversations', requestId, userId });
+        return createErrorResult(err);
     }
-    
 }
 
 async function getMessageCount(conversationId) {
-    const supabase = getSupabase();
-    console.log('[DB] Getting message count for conversation:', conversationId);
+    const requestId = generateRequestId();
+    Logger.info(`Getting message count for conversation: ${conversationId}`, DB_CONTEXT, { requestId });
     
-    const { count, error } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('conversation_id', conversationId);
-    
-    if (error) {
-        console.error('[DB] Error counting messages:', error);
-        return 0;
+    try {
+        const supabase = getSupabase();
+        
+        const { count, error } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', conversationId);
+        
+        if (error) {
+            Logger.error(error, DB_CONTEXT, { operation: 'getMessageCount', requestId, conversationId });
+            return createErrorResult(error);
+        }
+        
+        Logger.info(`Message count: ${count || 0}`, DB_CONTEXT, { requestId });
+        return createSuccessResult(count || 0);
+        
+    } catch (err) {
+        Logger.error(err, DB_CONTEXT, { operation: 'getMessageCount', requestId, conversationId });
+        return createErrorResult(err);
     }
-    
-    console.log('[DB] Message count:', count);
-    return count || 0;
 }
