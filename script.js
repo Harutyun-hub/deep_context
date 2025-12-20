@@ -235,8 +235,8 @@ const debouncedLoadConversation = debounce((conversationId) => {
     loadConversation(conversationId);
 }, 300);
 
-// Page visibility change handler - mark auth as settling when returning to tab
-document.addEventListener('visibilitychange', () => {
+// Named handler for visibility change - enables proper removal
+function handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
         Logger.info(`Tab visible, current state: ${ChatStateMachine.getState()}`, 'Visibility');
         // Mark auth as potentially settling - Supabase may refresh token
@@ -246,7 +246,10 @@ document.addEventListener('visibilitychange', () => {
         // Re-sync UI in case it got out of sync
         ChatStateMachine.syncUI();
     }
-});
+}
+
+// Track if visibility listener is attached
+let visibilityListenerAttached = false;
 
 function closeAllChatDropdowns(e) {
     if (e && (e.target.closest('.chat-item-menu-btn') || e.target.closest('.chat-item-dropdown'))) {
@@ -302,6 +305,7 @@ function cleanupAllState() {
     cancelConversationLoad();
     cancelAIRequest();
     cleanupChatDropdowns();
+    detachEventListeners();
     
     // Reset state machine to IDLE
     if (ChatStateMachine.currentState !== ChatState.IDLE) {
@@ -316,9 +320,80 @@ function cleanupAllState() {
     isInitialized = false;
 }
 
+// ============================================
+// EVENT LISTENER MANAGEMENT
+// Centralized attachment/detachment to prevent memory leaks
+// ============================================
+
+function attachEventListeners() {
+    Logger.info('Attaching event listeners...', 'EventListeners');
+    
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const newChatBtn = document.querySelector('.new-chat-btn');
+    
+    if (messageInput) {
+        messageInput.removeEventListener('keypress', handleEnterKey);
+        messageInput.addEventListener('keypress', handleEnterKey);
+    } else {
+        Logger.warn('Message input not found', 'EventListeners');
+    }
+    
+    if (sendBtn) {
+        sendBtn.removeEventListener('click', handleSendMessage);
+        sendBtn.addEventListener('click', handleSendMessage);
+    } else {
+        Logger.warn('Send button not found', 'EventListeners');
+    }
+    
+    if (newChatBtn) {
+        newChatBtn.removeEventListener('click', handleNewChatClick);
+        newChatBtn.addEventListener('click', handleNewChatClick);
+    } else {
+        Logger.warn('New chat button not found', 'EventListeners');
+    }
+    
+    if (!visibilityListenerAttached) {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        visibilityListenerAttached = true;
+    }
+    
+    Logger.info('Event listeners attached successfully', 'EventListeners');
+}
+
+function detachEventListeners() {
+    Logger.info('Detaching event listeners...', 'EventListeners');
+    
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const newChatBtn = document.querySelector('.new-chat-btn');
+    
+    if (messageInput) {
+        messageInput.removeEventListener('keypress', handleEnterKey);
+    }
+    
+    if (sendBtn) {
+        sendBtn.removeEventListener('click', handleSendMessage);
+    }
+    
+    if (newChatBtn) {
+        newChatBtn.removeEventListener('click', handleNewChatClick);
+    }
+    
+    if (visibilityListenerAttached) {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        visibilityListenerAttached = false;
+    }
+    
+    Logger.info('Event listeners detached successfully', 'EventListeners');
+}
+
 if (typeof window !== 'undefined') {
     window.cleanupChatDropdowns = cleanupChatDropdowns;
     window.cleanupAllState = cleanupAllState;
+    window.attachEventListeners = attachEventListeners;
+    window.detachEventListeners = detachEventListeners;
 }
 
 function generateUUID() {
@@ -842,13 +917,17 @@ async function getAIResponse(userMessage, sessionId, userId) {
 
 async function handleSendMessage() {
     const input = document.getElementById('messageInput');
-    const message = input.value.trim();
     
-    if (!message) return;
-    
-    // Check if we can send (state machine controls this)
+    // Early guard: Check state machine first to prevent double-submit
     if (!ChatStateMachine.canSendMessage()) {
         Logger.warn(`Cannot send - chat not in IDLE state: ${ChatStateMachine.getState()}`, 'SendMessage');
+        return;
+    }
+    
+    // Early guard: Validate input is not empty or whitespace
+    const message = input ? input.value.trim() : '';
+    if (!message) {
+        Logger.info('Empty message, ignoring send request', 'SendMessage');
         return;
     }
     
@@ -940,7 +1019,10 @@ async function handleSendMessage() {
         }
     } catch (error) {
         handleError(error, 'Send message');
-        input.value = message;
+        showToast('Failed to send message. Please try again.', 'error');
+        if (input) {
+            input.value = message;
+        }
         ChatStateMachine.setState(ChatState.ERROR, 'Send message failed');
     } finally {
         // ALWAYS return to IDLE state - this guarantees input is unlocked
@@ -1450,21 +1532,8 @@ async function initializeChat() {
         return;
     }
     
-    const messageInput = document.getElementById('messageInput');
-    messageInput.removeEventListener('keypress', handleEnterKey);
-    messageInput.addEventListener('keypress', handleEnterKey);
-    
-    const sendBtn = document.getElementById('sendBtn');
-    sendBtn.removeEventListener('click', handleSendMessage);
-    sendBtn.addEventListener('click', handleSendMessage);
-    
-    const newChatBtn = document.querySelector('.new-chat-btn');
-    if (newChatBtn) {
-        newChatBtn.removeEventListener('click', handleNewChatClick);
-        newChatBtn.addEventListener('click', handleNewChatClick);
-    } else {
-        Logger.warn('New chat button not found', CHAT_CONTEXT);
-    }
+    // Attach all event listeners using centralized function
+    attachEventListeners();
     
     isInitialized = true;
     Logger.info('Chat initialization complete', CHAT_CONTEXT);
