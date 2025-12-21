@@ -46,7 +46,7 @@ const AI_FETCH_TIMEOUT_MS = 300000;
 const INPUT_UNLOCK_TIMEOUT_MS = 330000;
 const TYPING_EFFECT_TIMEOUT_MS = 15000;
 
-const SAVE_TIMEOUT_MS = 15000;
+const SAVE_TIMEOUT_MS = 60000;
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 1000;
 
@@ -835,85 +835,117 @@ async function getAIResponse(userMessage, sessionId, userId) {
     currentAIAbortController = localAbortController;
     
     let timeoutId = null;
+    let lastError = null;
     
-    try {
-        const companyFilter = document.getElementById('chatCompanyFilter');
-        const selectedCompany = companyFilter ? companyFilter.value : '';
-        
-        const requestBody = {
-            message: userMessage,
-            sessionId: sessionId,
-            userId: userId,
-            companyKey: selectedCompany || null
-        };
-        
-        // Create a timeout that aborts the local controller
-        const timeoutPromise = new Promise((_, reject) => {
-            timeoutId = setTimeout(() => {
-                // Only abort if this is still the current request
-                if (currentAIAbortController === localAbortController) {
-                    localAbortController.abort();
-                }
-                reject(new Error('AI response timed out after 5 minutes'));
-            }, AI_FETCH_TIMEOUT_MS);
-        });
-        
-        // Race between fetch and timeout
-        const fetchPromise = fetch('https://wimedia.app.n8n.cloud/webhook/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-            signal: localAbortController.signal
-        });
-        
-        const response = await Promise.race([fetchPromise, timeoutPromise]);
-        
-        // Clear timeout immediately on success
-        if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-        }
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const text = await response.text();
-        
-        if (!text || text.trim() === '') {
-            Logger.warn('Empty response from webhook', CHAT_CONTEXT);
-            throw new Error('Empty response from server');
-        }
-        
-        const data = JSON.parse(text);
-        
-        if (data.output) {
-            return data.output;
-        } else if (data.response) {
-            return data.response;
-        } else {
-            return data;
-        }
-    } catch (error) {
-        // Clear timeout on error
-        if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-        }
-        
-        if (error.name === 'AbortError') {
-            Logger.info('AI request was cancelled', CHAT_CONTEXT);
-            throw new Error('Request was cancelled');
-        }
-        Logger.error(error, CHAT_CONTEXT, { operation: 'getAIResponse' });
-        throw error;
-    } finally {
-        // Only clear global if this is still the current controller
+    const cleanupController = () => {
         if (currentAIAbortController === localAbortController) {
             currentAIAbortController = null;
         }
+    };
+    
+    try {
+        // Retry loop for network instability
+        for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+            try {
+                const companyFilter = document.getElementById('chatCompanyFilter');
+                const selectedCompany = companyFilter ? companyFilter.value : '';
+                
+                const requestBody = {
+                    message: userMessage,
+                    sessionId: sessionId,
+                    userId: userId,
+                    companyKey: selectedCompany || null
+                };
+                
+                // Create a timeout that aborts the local controller
+                const timeoutPromise = new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => {
+                        // Only abort if this is still the current request
+                        if (currentAIAbortController === localAbortController) {
+                            localAbortController.abort();
+                        }
+                        reject(new Error('AI response timed out after 5 minutes'));
+                    }, AI_FETCH_TIMEOUT_MS);
+                });
+                
+                // Race between fetch and timeout
+                const fetchPromise = fetch('https://wimedia.app.n8n.cloud/webhook/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody),
+                    signal: localAbortController.signal
+                });
+                
+                const response = await Promise.race([fetchPromise, timeoutPromise]);
+                
+                // Clear timeout immediately on success
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const text = await response.text();
+                
+                if (!text || text.trim() === '') {
+                    Logger.warn('Empty response from webhook', CHAT_CONTEXT);
+                    throw new Error('Empty response from server');
+                }
+                
+                const data = JSON.parse(text);
+                
+                if (data.output) {
+                    return data.output;
+                } else if (data.response) {
+                    return data.response;
+                } else {
+                    return data;
+                }
+            } catch (error) {
+                // Clear timeout on error
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+                
+                // Handle abort/cancellation - don't retry
+                if (error.name === 'AbortError') {
+                    Logger.info('AI request was cancelled', CHAT_CONTEXT);
+                    throw new Error('Request was cancelled');
+                }
+                
+                // Check if this is a network error that should be retried
+                const isNetworkError = error.message.includes('network') || 
+                                       error.message.includes('Network') ||
+                                       error.message.includes('ERR_NETWORK') ||
+                                       error.message.includes('Failed to fetch') ||
+                                       error.name === 'TypeError';
+                
+                if (isNetworkError && attempt < MAX_RETRY_ATTEMPTS) {
+                    Logger.warn(`Network error on attempt ${attempt}, retrying in ${RETRY_DELAY_MS}ms...`, CHAT_CONTEXT);
+                    lastError = error;
+                    // Wait before retrying
+                    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                    continue;
+                }
+                
+                Logger.error(error, CHAT_CONTEXT, { operation: 'getAIResponse', attempt });
+                throw error;
+            }
+        }
+        
+        // If we exhausted all retries, throw the last error
+        if (lastError) {
+            throw lastError;
+        }
+    } finally {
+        // Clean up controller only after all retries are done
+        cleanupController();
     }
 }
 
