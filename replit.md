@@ -105,6 +105,7 @@ The application is built with vanilla HTML, CSS, and JavaScript.
     - Global error boundary with `window.onerror` and `window.onunhandledrejection` handlers
     - Race condition prevention through sequential async/await initialization flow
     - Auth module exports both global functions and `Auth` object for backward compatibility
+    - **Double Initialization Guard**: `isAppInitializing` flag prevents concurrent `initApp()` calls from DOMContentLoaded and auth state change events running simultaneously
 - **Standardized Database Layer** (Added December 2025):
     - All Supabase operations return standardized `{ success, data, error }` objects
     - Consistent error handling pattern: check `result.success` before accessing `result.data`
@@ -135,6 +136,8 @@ The application is built with vanilla HTML, CSS, and JavaScript.
   - `Logger.info(message, context, meta)` - Blue-styled informational logs
   - `Logger.warn(message, context, meta)` - Orange-styled warning logs
   - `Logger.error(error, context, meta)` - Red-styled error logs with stack traces
+  - `Logger.markSupabaseReady()` - Called after Supabase initialization to flush buffered logs
+- **Log Buffer System**: Logs created before Supabase is initialized are buffered in memory and automatically flushed to the database once `markSupabaseReady()` is called from auth.js. This prevents "Supabase not initialized" errors during early page load.
 - **Console Output**: Distinctive color-coded formatting for easy visual identification
 - **Database Persistence**: Logs are persisted to `app_logs` Supabase table with user tracking
 - **Fail-Safe Design**: Supabase persistence failures are silent; console logging always works
