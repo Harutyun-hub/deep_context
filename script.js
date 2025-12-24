@@ -869,7 +869,7 @@ async function getAIResponse(userMessage, sessionId, userId) {
                 });
                 
                 // Race between fetch and timeout
-                const fetchPromise = fetch('https://wimedia.app.n8n.cloud/webhook/b329f5c2-b1ec-4e50-a0ca-17cc9a61dd6d', {
+                const fetchPromise = fetch('https://wimedia.app.n8n.cloud/webhook/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
