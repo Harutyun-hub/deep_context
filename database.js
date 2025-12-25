@@ -1,6 +1,12 @@
 const DB_CONTEXT = 'Database';
 let dbRequestCounter = 0;
 
+const CACHE_TTL = {
+    CONVERSATIONS: 30 * 1000,
+    MESSAGES: 60 * 1000,
+    USER_DATA: 120 * 1000
+};
+
 function generateRequestId() {
     return `req_${++dbRequestCounter}_${Date.now()}`;
 }
@@ -18,8 +24,8 @@ function withTimeout(promise, timeoutMs, requestId, operationName) {
     });
 }
 
-function createSuccessResult(data) {
-    return { success: true, data, error: null };
+function createSuccessResult(data, fromCache = false) {
+    return { success: true, data, error: null, fromCache };
 }
 
 function createErrorResult(error) {
@@ -33,6 +39,18 @@ function createErrorResult(error) {
             details: error?.details || null
         }
     };
+}
+
+function invalidateConversationCache(conversationId = null, userId = null) {
+    if (typeof QueryCache !== 'undefined') {
+        if (conversationId) {
+            QueryCache.invalidate(`conversations:${conversationId}`);
+            QueryCache.invalidate(`messages:${conversationId}`);
+        }
+        if (userId) {
+            QueryCache.invalidate(`user_conversations:${userId}`);
+        }
+    }
 }
 
 async function createConversation(userId, title = null, sessionId = null) {
@@ -57,6 +75,8 @@ async function createConversation(userId, title = null, sessionId = null) {
             return createErrorResult(error);
         }
         
+        invalidateConversationCache(null, userId);
+        
         Logger.info(`Conversation created: ${data.id}`, DB_CONTEXT, { requestId });
         return createSuccessResult(data);
         
@@ -68,6 +88,16 @@ async function createConversation(userId, title = null, sessionId = null) {
 
 async function getUserConversations(userId, limit = 50) {
     const requestId = generateRequestId();
+    const cacheKey = `user_conversations:${userId}:${limit}`;
+    
+    if (typeof QueryCache !== 'undefined') {
+        const cached = QueryCache.get(cacheKey, true);
+        if (cached) {
+            Logger.info(`Cache hit for user conversations`, DB_CONTEXT, { requestId, userId, fromCache: true });
+            return createSuccessResult(cached, true);
+        }
+    }
+    
     Logger.info(`Getting conversations for user: ${userId}`, DB_CONTEXT, { requestId, limit });
     
     try {
@@ -86,6 +116,11 @@ async function getUserConversations(userId, limit = 50) {
         }
         
         const conversations = data || [];
+        
+        if (typeof QueryCache !== 'undefined') {
+            QueryCache.set(cacheKey, conversations, { memoryTtl: CACHE_TTL.CONVERSATIONS, persist: true });
+        }
+        
         Logger.info(`Retrieved ${conversations.length} conversations`, DB_CONTEXT, { requestId });
         return createSuccessResult(conversations);
         
@@ -98,6 +133,16 @@ async function getUserConversations(userId, limit = 50) {
 async function getConversation(conversationId) {
     const requestId = generateRequestId();
     const startTime = Date.now();
+    const cacheKey = `conversations:${conversationId}`;
+    
+    if (typeof QueryCache !== 'undefined') {
+        const cached = QueryCache.get(cacheKey, true);
+        if (cached) {
+            Logger.info(`Cache hit for conversation`, DB_CONTEXT, { requestId, conversationId, fromCache: true });
+            return createSuccessResult(cached, true);
+        }
+    }
+    
     Logger.info(`Getting conversation: ${conversationId}`, DB_CONTEXT, { requestId });
     
     try {
@@ -109,7 +154,7 @@ async function getConversation(conversationId) {
             .eq('id', conversationId)
             .single();
         
-        const result = await withTimeout(queryPromise, 10000, requestId, 'getConversation');
+        const result = await withTimeout(queryPromise, 5000, requestId, 'getConversation');
         const { data, error, status, statusText } = result;
         const elapsed = Date.now() - startTime;
         
@@ -124,6 +169,10 @@ async function getConversation(conversationId) {
         if (error) {
             Logger.error(error, DB_CONTEXT, { operation: 'getConversation', requestId, conversationId });
             return createErrorResult(error);
+        }
+        
+        if (typeof QueryCache !== 'undefined' && data) {
+            QueryCache.set(cacheKey, data, { memoryTtl: CACHE_TTL.CONVERSATIONS, persist: true });
         }
         
         return createSuccessResult(data);
@@ -180,6 +229,8 @@ async function deleteConversation(conversationId) {
             return createErrorResult(error);
         }
         
+        invalidateConversationCache(conversationId);
+        
         Logger.info('Conversation deleted successfully', DB_CONTEXT, { requestId });
         return createSuccessResult(true);
         
@@ -224,6 +275,8 @@ async function saveMessageToSupabase(conversationId, userId, role, content) {
         
         Logger.info(`Message saved: ${data.id}`, DB_CONTEXT, { requestId });
         
+        invalidateConversationCache(conversationId, userId);
+        
         supabase
             .from('conversations')
             .update({ updated_at: new Date().toISOString() })
@@ -245,6 +298,16 @@ async function saveMessageToSupabase(conversationId, userId, role, content) {
 async function loadMessagesFromSupabase(conversationId) {
     const requestId = generateRequestId();
     const startTime = Date.now();
+    const cacheKey = `messages:${conversationId}`;
+    
+    if (typeof QueryCache !== 'undefined') {
+        const cached = QueryCache.get(cacheKey, false);
+        if (cached) {
+            Logger.info(`Cache hit for messages`, DB_CONTEXT, { requestId, conversationId, count: cached.length, fromCache: true });
+            return createSuccessResult(cached, true);
+        }
+    }
+    
     Logger.info(`Loading messages for conversation: ${conversationId}`, DB_CONTEXT, { requestId });
     
     try {
@@ -256,7 +319,7 @@ async function loadMessagesFromSupabase(conversationId) {
             .eq('conversation_id', conversationId)
             .order('created_at', { ascending: true });
         
-        const result = await withTimeout(queryPromise, 10000, requestId, 'loadMessagesFromSupabase');
+        const result = await withTimeout(queryPromise, 5000, requestId, 'loadMessagesFromSupabase');
         const { data, error, status, statusText } = result;
         const elapsed = Date.now() - startTime;
         
@@ -290,6 +353,10 @@ async function loadMessagesFromSupabase(conversationId) {
                 content: content
             };
         });
+        
+        if (typeof QueryCache !== 'undefined') {
+            QueryCache.set(cacheKey, messages, { memoryTtl: CACHE_TTL.MESSAGES, persist: false });
+        }
         
         return createSuccessResult(messages);
         

@@ -61,6 +61,13 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
 
+CONFIG_SCRIPT_TEMPLATE = '''<script>
+window.__SUPABASE_CONFIG__ = {{
+    url: "{url}",
+    anonKey: "{anon_key}"
+}};
+</script>'''
+
 class ProductionHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """Production-grade HTTP request handler with proper error handling."""
     
@@ -77,6 +84,18 @@ class ProductionHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             return MIME_TYPES[ext]
         return super().guess_type(path)
     
+    def _inject_config_into_html(self, content):
+        """Inject Supabase config directly into HTML to eliminate /api/config round-trip."""
+        config_script = CONFIG_SCRIPT_TEMPLATE.format(
+            url=SUPABASE_URL,
+            anon_key=SUPABASE_ANON_KEY
+        )
+        
+        if b'</head>' in content:
+            content = content.replace(b'</head>', config_script.encode('utf-8') + b'\n</head>')
+        
+        return content
+    
     def do_GET(self):
         """Handle GET requests with comprehensive error handling."""
         try:
@@ -87,6 +106,8 @@ class ProductionHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             
             if path == '/api/config':
                 self._handle_api_config()
+            elif path.endswith('.html') or path == '/' or path == '':
+                self._handle_html_with_config(path)
             else:
                 super().do_GET()
                 
@@ -98,8 +119,35 @@ class ProductionHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             log_error(f"Internal server error handling {self.path}: {str(e)}")
             self._send_error_response(500, "Internal Server Error")
     
+    def _handle_html_with_config(self, path):
+        """Serve HTML files with embedded Supabase config."""
+        try:
+            if path == '/' or path == '':
+                path = '/index.html'
+            
+            file_path = '.' + path
+            
+            if not os.path.exists(file_path):
+                self.send_error(404, 'File not found')
+                return
+            
+            with open(file_path, 'rb') as f:
+                content = f.read()
+            
+            content = self._inject_config_into_html(content)
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+            
+        except Exception as e:
+            log_error(f"Error serving HTML with config: {str(e)}")
+            self.send_error(500, 'Internal Server Error')
+    
     def _handle_api_config(self):
-        """Handle the /api/config endpoint."""
+        """Handle the /api/config endpoint (fallback for cached clients)."""
         try:
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
