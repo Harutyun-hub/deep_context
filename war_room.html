@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>War Room | Nimbus AI</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="war_room.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="war-room">
+        <header class="war-room-header">
+            <div class="header-left">
+                <h1 class="war-room-title">WAR ROOM</h1>
+                <span class="subtitle">TACTICAL COMMAND CENTER</span>
+            </div>
+            <div class="header-right">
+                <div class="system-time">
+                    <span class="time-label">SYSTEM TIME</span>
+                    <span class="time-value" id="systemTime">--:--:--</span>
+                </div>
+                <div class="connection-status" id="connectionStatus">
+                    <span class="status-dot"></span>
+                    <span class="status-text">CONNECTING...</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="command-deck">
+            <div class="defcon-module" id="defconModule">
+                <div class="defcon-card glass-card">
+                    <div class="defcon-header">
+                        <span class="defcon-label">THREAT ASSESSMENT</span>
+                        <span class="defcon-badge" id="defconBadge">ANALYZING</span>
+                    </div>
+                    <div class="defcon-content">
+                        <div class="threat-level-display">
+                            <span class="threat-icon" id="threatIcon">⚠</span>
+                            <span class="threat-text" id="threatText">INITIALIZING...</span>
+                        </div>
+                        <p class="threat-description" id="threatDescription">Scanning competitor activity...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="aggression-module" id="aggressionModule">
+                <div class="aggression-card glass-card">
+                    <div class="aggression-header">
+                        <span class="aggression-label">AGGRESSION INDEX</span>
+                    </div>
+                    <div class="aggression-content">
+                        <div class="aggression-gauge">
+                            <span class="aggression-value" id="aggressionValue">--</span>
+                            <span class="aggression-unit">/100</span>
+                        </div>
+                        <div class="aggression-bar-container">
+                            <div class="aggression-bar" id="aggressionBar"></div>
+                        </div>
+                        <p class="aggression-description" id="aggressionDescription">Measuring competitor intensity...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="ticker-tape" id="tickerTape">
+            <div class="ticker-content" id="tickerContent">
+                <span class="ticker-item">⚡ LIVE COMPETITOR ACTIVITY FEED</span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">📊 Monitoring 24 active campaigns</span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">🎯 3 new targeting changes detected</span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">💰 Budget shift alert: +15% spend increase</span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">🔍 2 new creative variants launched</span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">⏰ Last scan: <span id="lastScanTime">--:--</span></span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">⚡ LIVE COMPETITOR ACTIVITY FEED</span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">📊 Monitoring 24 active campaigns</span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">🎯 3 new targeting changes detected</span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">💰 Budget shift alert: +15% spend increase</span>
+                <span class="ticker-separator">|</span>
+                <span class="ticker-item">🔍 2 new creative variants launched</span>
+                <span class="ticker-separator">|</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="SupabaseManager.js"></script>
+    <script src="war_room.js"></script>
+</body>
+</html>
