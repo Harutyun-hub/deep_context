@@ -22,7 +22,7 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Message Display**: Glass bubble messages with avatars; user messages on the right (50% opacity), AI messages on the left (40% opacity).
 - **Dashboard Design**: Glass filter section, blue table headers, collapsible content sections.
 - **Competitive Intelligence Suite**: 4-pillar tabbed navigation for Battlefield Overview, Pulse of Engagement, Creative Strategy, and Website Espionage.
-- **War Room Design**: "Neon Glass" dark cyberpunk aesthetic with deep slate background, neon accents, Inter and JetBrains Mono typography, DEFCON module, Aggression Gauge, and Ticker Tape.
+- **War Room Design**: "Neon Glass" dark cyberpunk aesthetic with deep slate background, neon accents, Inter and JetBrains Mono typography, DEFCON module, Aggression Gauge, Ticker Tape, Mission Control dropdowns with neon glow effects, and bi-directional Battlefield timeline chart.
 
 ### Technical Implementations
 - **Authentication**: Supabase Auth with Google OAuth.
@@ -37,7 +37,7 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Standardized Database Layer**: All Supabase operations return `{ success, data, error }` objects for consistent error handling.
 - **Server**: Python HTTP server for `/api/config` to deliver secure credentials.
 - **Competitive Intelligence Suite**: `dashboard.html` with client-vs-competitor comparison using Supabase queries and Chart.js.
-- **War Room**: `/war_room.html` standalone page displaying real-time competitive intelligence scores from `intelligence_scores` Supabase view with a 30-second auto-refresh.
+- **War Room**: `/war_room.html` standalone page with Command Deck (DEFCON + Aggression Gauge from `intelligence_scores` view), Mission Control (company selector dropdowns with neon glow), and Battlefield Chart (30-day bi-directional bar chart aggregating facebook_ads, google_ads, instagram_posts). All sections auto-refresh every 30 seconds. TotoGaming Protocol ensures default selection of company ID `9b67e411-ec00-47d9-87d4-a56dacf41e8a` as the friendly DEFENSE ASSET.
 
 ### Feature Specifications
 - **Multi-User/Multi-Company Support**: Private conversation history and data with centralized company management.
@@ -45,7 +45,7 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Message Persistence**: Chat history saved in Supabase with RLS.
 - **Rich Content Display**: AI responses support rich text, interactive charts, tables, and media galleries.
 - **Competitive Intelligence Suite**: 4-pillar strategic dashboard for market analysis, engagement trends, creative strategy, and website tracking.
-- **War Room**: Tactical Command Center displaying DEFCON threat levels, aggression gauge, and a live competitor activity feed.
+- **War Room**: Tactical Command Center displaying DEFCON threat levels, aggression gauge, live competitor activity ticker, Mission Control for company vs. competitor selection (TotoGaming Protocol default), and Battlefield bi-directional bar chart showing 30-day marketing activity timeline.
 
 ## External Dependencies
 - **Supabase**: User authentication (Google OAuth), PostgreSQL database, and Row Level Security.
