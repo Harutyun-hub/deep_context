@@ -169,7 +169,7 @@ if (typeof window !== 'undefined') {
     window.ChatState = ChatState;
 }
 
-const NIMBUS_AVATAR_BASE64 = 'attached_assets/nimbus_logo_horizontal_1766670595526.png';
+const NIMBUS_AVATAR_BASE64 = 'attached_assets/omb_(1)_1766684733796.png';
 
 function withTimeout(promise, timeoutMs = SAVE_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
