@@ -244,6 +244,7 @@
             competitorCompanyId = e.target.value;
             log('Competitor company changed', { id: competitorCompanyId });
             loadBattlefieldData();
+            loadSurveillanceData();
         });
         
         log('Mission Control initialized', { primary: primaryCompanyId, competitor: competitorCompanyId });
@@ -679,6 +680,253 @@
         loadDefaultIntelFeed();
     }
 
+    async function scanTechStack() {
+        const statusEl = document.getElementById('techRadarStatus');
+        const metaBadge = document.getElementById('metaPixelBadge');
+        const gtmBadge = document.getElementById('gtmBadge');
+        const tiktokBadge = document.getElementById('tiktokBadge');
+        const hotjarBadge = document.getElementById('hotjarBadge');
+        
+        if (!competitorCompanyId) {
+            if (statusEl) statusEl.textContent = 'AWAITING TARGET';
+            return;
+        }
+        
+        if (statusEl) statusEl.textContent = 'SCANNING...';
+        
+        try {
+            const supabase = await SupabaseManager.getClient();
+            
+            const { data, error } = await supabase
+                .from('website_data')
+                .select('html_raw, created_at')
+                .eq('company_id', competitorCompanyId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+            
+            if (error || !data || !data.html_raw) {
+                log('No website data found for competitor');
+                if (statusEl) statusEl.textContent = 'NO DATA';
+                resetTechBadges();
+                return;
+            }
+            
+            const html = data.html_raw.toLowerCase();
+            
+            const hasMeta = html.includes('connect.facebook.net') || html.includes('fbevents.js');
+            const hasGTM = html.includes('googletagmanager');
+            const hasTikTok = html.includes('tiktok');
+            const hasHotjar = html.includes('hotjar');
+            
+            updateTechBadge('meta', metaBadge, hasMeta);
+            updateTechBadge('gtm', gtmBadge, hasGTM);
+            updateTechBadge('tiktok', tiktokBadge, hasTikTok);
+            updateTechBadge('hotjar', hotjarBadge, hasHotjar);
+            
+            const detectedCount = [hasMeta, hasGTM, hasTikTok, hasHotjar].filter(Boolean).length;
+            
+            if (statusEl) {
+                statusEl.textContent = `${detectedCount} DETECTED`;
+                statusEl.classList.toggle('active', detectedCount > 0);
+            }
+            
+            log(`Tech scan complete: ${detectedCount} technologies detected`);
+            
+        } catch (error) {
+            log('Tech scan error: ' + error.message);
+            if (statusEl) statusEl.textContent = 'ERROR';
+        }
+    }
+    
+    function updateTechBadge(techType, badgeEl, isDetected) {
+        if (!badgeEl) return;
+        
+        const techItem = badgeEl.closest('.tech-item');
+        
+        if (isDetected) {
+            badgeEl.textContent = 'DETECTED';
+            badgeEl.className = `tech-badge active ${techType}`;
+            if (techItem) techItem.classList.add('detected');
+        } else {
+            badgeEl.textContent = 'NOT DETECTED';
+            badgeEl.className = 'tech-badge inactive';
+            if (techItem) techItem.classList.remove('detected');
+        }
+    }
+    
+    function resetTechBadges() {
+        const badges = ['metaPixelBadge', 'gtmBadge', 'tiktokBadge', 'hotjarBadge'];
+        const types = ['meta', 'gtm', 'tiktok', 'hotjar'];
+        
+        badges.forEach((id, index) => {
+            const badge = document.getElementById(id);
+            updateTechBadge(types[index], badge, false);
+        });
+    }
+
+    async function loadVisualIntercept() {
+        const contentEl = document.getElementById('visualInterceptContent');
+        const statusEl = document.getElementById('visualInterceptStatus');
+        
+        if (!contentEl) return;
+        
+        if (!competitorCompanyId) {
+            statusEl.textContent = 'AWAITING TARGET';
+            statusEl.className = 'visual-intercept-status';
+            contentEl.innerHTML = `
+                <div class="visual-loading">
+                    <span class="visual-loading-text">Select a target to intercept visuals...</span>
+                </div>
+            `;
+            return;
+        }
+        
+        statusEl.textContent = 'INTERCEPTING...';
+        
+        try {
+            const supabase = await SupabaseManager.getClient();
+            
+            const { data, error } = await supabase
+                .from('screenshots')
+                .select('id, screenshot_url, created_at')
+                .eq('company_id', competitorCompanyId)
+                .order('created_at', { ascending: false })
+                .limit(2);
+            
+            if (error) {
+                log('Visual intercept error: ' + error.message);
+                statusEl.textContent = 'ERROR';
+                return;
+            }
+            
+            if (!data || data.length === 0) {
+                statusEl.textContent = 'NO INTEL';
+                statusEl.className = 'visual-intercept-status';
+                contentEl.innerHTML = `
+                    <div class="no-intel">
+                        <span class="no-intel-icon">🔍</span>
+                        <span class="no-intel-text">NO VISUAL INTEL<br/>No screenshots captured yet</span>
+                    </div>
+                `;
+                log('No screenshots found for competitor');
+                return;
+            }
+            
+            if (data.length === 1) {
+                statusEl.textContent = 'BASELINE';
+                statusEl.className = 'visual-intercept-status baseline';
+                
+                const screenshot = data[0];
+                const dateStr = new Date(screenshot.created_at).toLocaleDateString('en-US', { 
+                    month: 'short', day: 'numeric', year: 'numeric' 
+                });
+                
+                contentEl.innerHTML = `
+                    <div class="single-screenshot">
+                        <img src="${screenshot.screenshot_url}" alt="Baseline screenshot" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect fill=%22%231E293B%22 width=%22400%22 height=%22300%22/><text fill=%22%2364748B%22 x=%22200%22 y=%22150%22 text-anchor=%22middle%22 font-family=%22monospace%22>Image unavailable</text></svg>'">
+                        <div class="baseline-badge">BASELINE ESTABLISHED<br/>${dateStr}</div>
+                    </div>
+                `;
+                log('Single screenshot found - showing baseline');
+                return;
+            }
+            
+            statusEl.textContent = 'COMPARING';
+            statusEl.className = 'visual-intercept-status comparing';
+            
+            const [newer, older] = data;
+            const newerDate = new Date(newer.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const olderDate = new Date(older.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            
+            contentEl.innerHTML = `
+                <div class="diff-slider-container" id="diffSlider">
+                    <img class="diff-image before" src="${older.screenshot_url}" alt="Before">
+                    <img class="diff-image after" src="${newer.screenshot_url}" alt="After">
+                    <div class="diff-slider-handle" id="diffHandle"></div>
+                    <div class="diff-labels">
+                        <span class="diff-label before">BEFORE (${olderDate})</span>
+                        <span class="diff-label after">AFTER (${newerDate})</span>
+                    </div>
+                </div>
+            `;
+            
+            initDiffSlider();
+            log('Two screenshots found - diff slider initialized');
+            
+        } catch (error) {
+            log('Visual intercept error: ' + error.message);
+            statusEl.textContent = 'ERROR';
+        }
+    }
+    
+    function initDiffSlider() {
+        const container = document.getElementById('diffSlider');
+        const handle = document.getElementById('diffHandle');
+        const afterImage = container?.querySelector('.diff-image.after');
+        
+        if (!container || !handle || !afterImage) return;
+        
+        let isDragging = false;
+        
+        function updateSlider(clientX) {
+            const rect = container.getBoundingClientRect();
+            let position = ((clientX - rect.left) / rect.width) * 100;
+            position = Math.max(0, Math.min(100, position));
+            
+            handle.style.left = `${position}%`;
+            afterImage.style.clipPath = `inset(0 ${100 - position}% 0 0)`;
+        }
+        
+        handle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            e.preventDefault();
+        });
+        
+        container.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            updateSlider(e.clientX);
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                updateSlider(e.clientX);
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        handle.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            e.preventDefault();
+        });
+        
+        container.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            updateSlider(e.touches[0].clientX);
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (isDragging && e.touches.length > 0) {
+                updateSlider(e.touches[0].clientX);
+            }
+        });
+        
+        document.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+    }
+
+    async function loadSurveillanceData() {
+        log('Loading surveillance data...');
+        await Promise.all([
+            scanTechStack(),
+            loadVisualIntercept()
+        ]);
+    }
+
     async function init() {
         log('Initializing War Room...');
 
@@ -690,9 +938,11 @@
             
             await initMissionControl();
             await loadBattlefieldData();
+            await loadSurveillanceData();
             
             setInterval(refreshDashboard, 30000);
             setInterval(loadBattlefieldData, 30000);
+            setInterval(loadSurveillanceData, 30000);
             
             log('War Room initialized successfully');
         } catch (error) {
