@@ -105,19 +105,40 @@
                 </div>
             </div>
 
-            <div class="battlefield-chart glass-card">
-                <div class="battlefield-header">
-                    <span class="battlefield-label">TACTICAL TIMELINE (30 DAYS)</span>
-                    <div class="battlefield-legend">
-                        <span class="legend-item friendly"><span class="legend-dot friendly"></span> US</span>
-                        <span class="legend-item hostile"><span class="legend-dot hostile"></span> THEM</span>
+            <div class="battlefield-container">
+                <div class="battlefield-chart glass-card">
+                    <div class="battlefield-header">
+                        <span class="battlefield-label">TACTICAL TIMELINE (30 DAYS)</span>
+                        <div class="battlefield-legend-custom">
+                            <div class="legend-group friendly-legends">
+                                <span class="legend-item paid"><span class="legend-swatch friendly-paid"></span> PAID OFFENSIVE</span>
+                                <span class="legend-item organic"><span class="legend-swatch friendly-organic"></span> ORGANIC NOISE</span>
+                            </div>
+                            <span class="legend-divider">|</span>
+                            <div class="legend-group hostile-legends">
+                                <span class="legend-item paid"><span class="legend-swatch hostile-paid"></span> PAID OFFENSIVE</span>
+                                <span class="legend-item organic"><span class="legend-swatch hostile-organic"></span> ORGANIC NOISE</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="battlefield-canvas-container">
+                        <canvas id="battlefieldChart"></canvas>
+                    </div>
+                    <div class="battlefield-footer">
+                        <span class="frontline-label">FRONTLINE</span>
                     </div>
                 </div>
-                <div class="battlefield-canvas-container">
-                    <canvas id="battlefieldChart"></canvas>
-                </div>
-                <div class="battlefield-footer">
-                    <span class="frontline-label">FRONTLINE</span>
+                
+                <div class="intel-feed glass-card">
+                    <div class="intel-feed-header">
+                        <span class="intel-feed-label">LIVE INTEL FEED</span>
+                        <span class="intel-feed-status" id="intelFeedStatus">STANDBY</span>
+                    </div>
+                    <div class="intel-feed-content" id="intelFeedContent">
+                        <div class="intel-loading">
+                            <span class="intel-loading-text">Awaiting target selection...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>

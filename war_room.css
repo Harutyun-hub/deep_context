@@ -749,6 +749,258 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.battlefield-container {
+    display: grid;
+    grid-template-columns: 70% 30%;
+    gap: 1.5rem;
+}
+
+.battlefield-chart {
+    flex: 1;
+}
+
+.battlefield-legend-custom {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.legend-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.legend-group.friendly-legends {
+    color: var(--accent-blue);
+}
+
+.legend-group.hostile-legends {
+    color: var(--threat-critical);
+}
+
+.legend-divider {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.legend-item.paid {
+    font-weight: 600;
+}
+
+.legend-item.organic {
+    font-weight: 400;
+    opacity: 0.7;
+}
+
+.legend-swatch {
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.legend-swatch.friendly-paid {
+    background: #3B82F6;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+}
+
+.legend-swatch.friendly-organic {
+    background: rgba(59, 130, 246, 0.3);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.legend-swatch.hostile-paid {
+    background: #EF4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.legend-swatch.hostile-organic {
+    background: rgba(239, 68, 68, 0.3);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.intel-feed {
+    display: flex;
+    flex-direction: column;
+    min-height: 380px;
+    max-height: 450px;
+}
+
+.intel-feed-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.intel-feed-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+}
+
+.intel-feed-status {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--threat-secure);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.intel-feed-status.active {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--threat-critical);
+    border-color: rgba(239, 68, 68, 0.3);
+    animation: pulse-status 2s ease-in-out infinite;
+}
+
+@keyframes pulse-status {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.intel-feed-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.intel-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+}
+
+.intel-loading-text {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+}
+
+.intel-card {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.intel-card:hover {
+    border-color: var(--threat-critical);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
+}
+
+.intel-card.friendly:hover {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
+}
+
+.intel-thumbnail {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--bg-secondary);
+    flex-shrink: 0;
+}
+
+.intel-thumbnail-placeholder {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.intel-thumbnail-placeholder span {
+    font-size: 1.5rem;
+    opacity: 0.5;
+}
+
+.intel-details {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.intel-source {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.intel-source.facebook { color: #1877F2; }
+.intel-source.google { color: #4285F4; }
+.intel-source.instagram { color: #E4405F; }
+
+.intel-text {
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.intel-meta {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--text-muted);
+}
+
+.intel-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 0.5rem;
+}
+
+.intel-empty-icon {
+    font-size: 2rem;
+    opacity: 0.4;
+}
+
+.intel-empty-text {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
 @media (max-width: 1024px) {
     .command-deck {
         grid-template-columns: 1fr;
@@ -756,6 +1008,24 @@ body {
     
     .battlefield-section {
         padding: 0 1rem 1rem;
+    }
+    
+    .battlefield-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .intel-feed {
+        min-height: 250px;
+        max-height: 300px;
+    }
+    
+    .battlefield-legend-custom {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .legend-divider {
+        display: none;
     }
     
     .mission-control-selectors {

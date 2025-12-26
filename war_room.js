@@ -9,6 +9,8 @@
     let competitorCompanyId = null;
     let battlefieldChart = null;
     let companies = [];
+    let battlefieldRawData = null;
+    let currentHoverDate = null;
 
     function log(message, meta = null) {
         const timestamp = new Date().toISOString();
@@ -249,7 +251,7 @@
 
     async function fetchBattlefieldData() {
         try {
-            log('Fetching battlefield data...');
+            log('Fetching battlefield data (Paid vs Organic)...');
             
             await SupabaseManager.initialize();
             const client = SupabaseManager.getClient();
@@ -263,41 +265,63 @@
             const [fbResult, googleResult, igResult] = await Promise.all([
                 client
                     .from('facebook_ads')
-                    .select('id, company_id, start_date_string')
+                    .select('id, company_id, start_date_string, ad_image_url, ad_text, page_name')
                     .in('company_id', companyIds)
-                    .gte('start_date_string', dateFilter),
+                    .gte('start_date_string', dateFilter)
+                    .order('start_date_string', { ascending: false }),
                 client
                     .from('google_ads')
-                    .select('id, company_id, first_shown')
+                    .select('id, company_id, first_shown, image_url, url')
                     .in('company_id', companyIds)
-                    .gte('first_shown', dateFilter),
+                    .gte('first_shown', dateFilter)
+                    .order('first_shown', { ascending: false }),
                 client
                     .from('instagram_posts')
-                    .select('id, company_id, created_at')
+                    .select('id, company_id, created_at, display_uri, text, username')
                     .in('company_id', companyIds)
                     .gte('created_at', dateFilter)
+                    .order('created_at', { ascending: false })
             ]);
             
             const fbData = (fbResult.data || []).map(item => ({
                 ...item,
-                created_at: item.start_date_string
+                created_at: item.start_date_string,
+                source: 'facebook',
+                type: 'paid',
+                image_url: item.ad_image_url,
+                text: item.ad_text,
+                title: item.page_name
             }));
+            
             const googleData = (googleResult.data || []).map(item => ({
                 ...item,
-                created_at: item.first_shown
+                created_at: item.first_shown,
+                source: 'google',
+                type: 'paid',
+                image_url: item.image_url,
+                text: item.url,
+                title: 'Google Ad'
             }));
-            const allData = [
-                ...fbData,
-                ...googleData,
-                ...(igResult.data || [])
-            ];
+            
+            const igData = (igResult.data || []).map(item => ({
+                ...item,
+                source: 'instagram',
+                type: 'organic',
+                image_url: item.display_uri,
+                text: item.text,
+                title: item.username
+            }));
+            
+            const allData = [...fbData, ...googleData, ...igData];
             
             log('Battlefield raw data fetched', { 
-                fb: fbResult.data?.length || 0,
-                google: googleResult.data?.length || 0,
-                ig: igResult.data?.length || 0
+                fb: fbData.length,
+                google: googleData.length,
+                ig: igData.length,
+                total: allData.length
             });
             
+            battlefieldRawData = allData;
             return allData;
         } catch (error) {
             log('Failed to fetch battlefield data: ' + error.message);
@@ -306,36 +330,60 @@
     }
 
     function aggregateByDay(data) {
+        const daysList = [];
         const dayMap = {};
         
         for (let i = 29; i >= 0; i--) {
             const date = new Date();
             date.setDate(date.getDate() - i);
             const dayKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            dayMap[dayKey] = { friendly: 0, hostile: 0, dateObj: new Date(date) };
+            const isoDate = date.toISOString().split('T')[0];
+            
+            daysList.push({ dayKey, isoDate });
+            dayMap[dayKey] = { 
+                friendlyPaid: 0, 
+                friendlyOrganic: 0,
+                hostilePaid: 0, 
+                hostileOrganic: 0
+            };
         }
         
         data.forEach(item => {
+            if (!item.created_at) return;
             const itemDate = new Date(item.created_at);
             const dayKey = itemDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             
             if (dayMap[dayKey]) {
-                if (item.company_id === primaryCompanyId) {
-                    dayMap[dayKey].friendly++;
+                const isFriendly = item.company_id === primaryCompanyId;
+                const isPaid = item.type === 'paid';
+                
+                if (isFriendly) {
+                    if (isPaid) {
+                        dayMap[dayKey].friendlyPaid++;
+                    } else {
+                        dayMap[dayKey].friendlyOrganic++;
+                    }
                 } else if (item.company_id === competitorCompanyId) {
-                    dayMap[dayKey].hostile++;
+                    if (isPaid) {
+                        dayMap[dayKey].hostilePaid++;
+                    } else {
+                        dayMap[dayKey].hostileOrganic++;
+                    }
                 }
             }
         });
         
-        const labels = Object.keys(dayMap);
-        const friendlyData = labels.map(key => dayMap[key].friendly);
-        const hostileData = labels.map(key => -dayMap[key].hostile);
+        const labels = daysList.map(d => d.dayKey);
+        const isoDates = daysList.map(d => d.isoDate);
+        const friendlyPaidData = labels.map(key => dayMap[key].friendlyPaid);
+        const friendlyOrganicData = labels.map(key => dayMap[key].friendlyOrganic);
+        const hostilePaidData = labels.map(key => -dayMap[key].hostilePaid);
+        const hostileOrganicData = labels.map(key => -dayMap[key].hostileOrganic);
         
-        return { labels, friendlyData, hostileData };
+        return { labels, isoDates, friendlyPaidData, friendlyOrganicData, hostilePaidData, hostileOrganicData };
     }
 
-    function renderBattlefieldChart(labels, friendlyData, hostileData) {
+    function renderBattlefieldChart(chartData) {
         const canvas = document.getElementById('battlefieldChart');
         if (!canvas) return;
         
@@ -348,27 +396,51 @@
         battlefieldChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: labels,
+                labels: chartData.labels,
                 datasets: [
                     {
-                        label: 'US (Friendly)',
-                        data: friendlyData,
-                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        label: 'Friendly Paid Ads',
+                        data: chartData.friendlyPaidData,
+                        backgroundColor: '#3B82F6',
                         borderColor: '#3B82F6',
-                        borderWidth: 1,
-                        borderRadius: 4,
-                        barPercentage: 0.8,
-                        categoryPercentage: 0.9
+                        borderWidth: 0,
+                        borderRadius: 2,
+                        barPercentage: 0.85,
+                        categoryPercentage: 0.9,
+                        stack: 'Us'
                     },
                     {
-                        label: 'THEM (Hostile)',
-                        data: hostileData,
-                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
-                        borderColor: '#EF4444',
+                        label: 'Friendly Organic',
+                        data: chartData.friendlyOrganicData,
+                        backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                        borderColor: 'rgba(59, 130, 246, 0.5)',
                         borderWidth: 1,
-                        borderRadius: 4,
-                        barPercentage: 0.8,
-                        categoryPercentage: 0.9
+                        borderRadius: 2,
+                        barPercentage: 0.85,
+                        categoryPercentage: 0.9,
+                        stack: 'Us'
+                    },
+                    {
+                        label: 'Enemy Paid Ads',
+                        data: chartData.hostilePaidData,
+                        backgroundColor: '#EF4444',
+                        borderColor: '#EF4444',
+                        borderWidth: 0,
+                        borderRadius: 2,
+                        barPercentage: 0.85,
+                        categoryPercentage: 0.9,
+                        stack: 'Them'
+                    },
+                    {
+                        label: 'Enemy Organic',
+                        data: chartData.hostileOrganicData,
+                        backgroundColor: 'rgba(239, 68, 68, 0.3)',
+                        borderColor: 'rgba(239, 68, 68, 0.5)',
+                        borderWidth: 1,
+                        borderRadius: 2,
+                        barPercentage: 0.85,
+                        categoryPercentage: 0.9,
+                        stack: 'Them'
                     }
                 ]
             },
@@ -378,6 +450,17 @@
                 interaction: {
                     intersect: false,
                     mode: 'index'
+                },
+                onHover: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const hoveredDate = chartData.isoDates[index];
+                        const hoveredLabel = chartData.labels[index];
+                        if (currentHoverDate !== hoveredDate) {
+                            currentHoverDate = hoveredDate;
+                            updateIntelFeed(hoveredDate, hoveredLabel);
+                        }
+                    }
                 },
                 plugins: {
                     legend: {
@@ -403,14 +486,15 @@
                         callbacks: {
                             label: function(context) {
                                 const value = Math.abs(context.raw);
-                                const label = context.datasetIndex === 0 ? 'US Activity' : 'THEM Activity';
-                                return label + ': ' + value;
+                                const labels = ['US Paid', 'US Organic', 'THEM Paid', 'THEM Organic'];
+                                return labels[context.datasetIndex] + ': ' + value;
                             }
                         }
                     }
                 },
                 scales: {
                     x: {
+                        stacked: true,
                         grid: {
                             display: false
                         },
@@ -428,27 +512,160 @@
                         }
                     },
                     y: {
+                        stacked: true,
                         grid: {
-                            display: false
+                            color: (context) => {
+                                if (context.tick.value === 0) {
+                                    return 'rgba(255, 255, 255, 0.8)';
+                                }
+                                return 'transparent';
+                            },
+                            lineWidth: (context) => {
+                                if (context.tick.value === 0) {
+                                    return 2;
+                                }
+                                return 0;
+                            }
                         },
                         ticks: {
                             display: false
                         },
                         border: {
-                            display: true,
-                            color: 'rgba(255, 255, 255, 0.8)',
-                            width: 2
+                            display: false
                         }
                     }
                 }
             }
         });
         
-        log('Battlefield chart rendered');
+        log('Stacked battlefield chart rendered');
+    }
+
+    function updateIntelFeed(dateStr, label) {
+        const contentEl = document.getElementById('intelFeedContent');
+        const statusEl = document.getElementById('intelFeedStatus');
+        
+        if (!contentEl) return;
+        
+        if (!battlefieldRawData || battlefieldRawData.length === 0 || !competitorCompanyId) {
+            contentEl.innerHTML = `
+                <div class="intel-loading">
+                    <span class="intel-loading-text">Loading intel data...</span>
+                </div>
+            `;
+            return;
+        }
+        
+        statusEl.textContent = 'SCANNING ' + label;
+        statusEl.classList.add('active');
+        
+        const dayItems = battlefieldRawData.filter(item => {
+            const itemDate = new Date(item.created_at).toISOString().split('T')[0];
+            return itemDate === dateStr && item.company_id === competitorCompanyId;
+        });
+        
+        const paidFirst = dayItems.sort((a, b) => {
+            if (a.type === 'paid' && b.type !== 'paid') return -1;
+            if (a.type !== 'paid' && b.type === 'paid') return 1;
+            return 0;
+        });
+        
+        const topItems = paidFirst.slice(0, 3);
+        
+        if (topItems.length === 0) {
+            contentEl.innerHTML = `
+                <div class="intel-empty">
+                    <span class="intel-empty-icon">🔍</span>
+                    <span class="intel-empty-text">No enemy intel for ${label}</span>
+                </div>
+            `;
+            return;
+        }
+        
+        contentEl.innerHTML = topItems.map(item => renderIntelCard(item)).join('');
+    }
+
+    function renderIntelCard(item) {
+        const sourceIcon = {
+            'facebook': '📘',
+            'google': '🔷',
+            'instagram': '📸'
+        };
+        
+        const typeLabel = item.type === 'paid' ? 'PAID' : 'ORGANIC';
+        const textContent = item.text || item.title || '';
+        const truncatedText = textContent.length > 80 ? textContent.substring(0, 80) + '...' : textContent;
+        const displayText = truncatedText || 'No description available';
+        
+        let dateStr = '';
+        try {
+            dateStr = new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch (e) {
+            dateStr = 'Unknown date';
+        }
+        
+        const thumbnailHtml = item.image_url 
+            ? `<img class="intel-thumbnail" src="${item.image_url}" alt="Creative" onerror="this.parentElement.innerHTML='<div class=\\'intel-thumbnail-placeholder\\'><span>${sourceIcon[item.source] || '📄'}</span></div>'">`
+            : `<div class="intel-thumbnail-placeholder"><span>${sourceIcon[item.source] || '📄'}</span></div>`;
+        
+        const sourceName = (item.source || 'unknown').toUpperCase();
+        
+        return `
+            <div class="intel-card">
+                ${thumbnailHtml}
+                <div class="intel-details">
+                    <span class="intel-source ${item.source || ''}">${sourceName} · ${typeLabel}</span>
+                    <span class="intel-text">${displayText}</span>
+                    <span class="intel-meta">${dateStr}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    function loadDefaultIntelFeed() {
+        const contentEl = document.getElementById('intelFeedContent');
+        const statusEl = document.getElementById('intelFeedStatus');
+        
+        if (!contentEl || !battlefieldRawData) {
+            contentEl.innerHTML = `
+                <div class="intel-loading">
+                    <span class="intel-loading-text">Awaiting target selection...</span>
+                </div>
+            `;
+            return;
+        }
+        
+        statusEl.textContent = 'MONITORING';
+        statusEl.classList.remove('active');
+        
+        const enemyPaid = battlefieldRawData
+            .filter(item => item.company_id === competitorCompanyId && item.type === 'paid')
+            .slice(0, 3);
+        
+        if (enemyPaid.length === 0) {
+            const anyEnemy = battlefieldRawData
+                .filter(item => item.company_id === competitorCompanyId)
+                .slice(0, 3);
+            
+            if (anyEnemy.length === 0) {
+                contentEl.innerHTML = `
+                    <div class="intel-empty">
+                        <span class="intel-empty-icon">📡</span>
+                        <span class="intel-empty-text">No enemy activity detected<br/>in the last 30 days</span>
+                    </div>
+                `;
+                return;
+            }
+            
+            contentEl.innerHTML = anyEnemy.map(item => renderIntelCard(item)).join('');
+            return;
+        }
+        
+        contentEl.innerHTML = enemyPaid.map(item => renderIntelCard(item)).join('');
     }
 
     async function loadBattlefieldData() {
-        log('Loading battlefield data...');
+        log('Loading battlefield data (stacked)...');
         
         if (!primaryCompanyId || !competitorCompanyId) {
             log('Missing company selection, skipping battlefield load');
@@ -456,9 +673,10 @@
         }
         
         const rawData = await fetchBattlefieldData();
-        const { labels, friendlyData, hostileData } = aggregateByDay(rawData);
+        const chartData = aggregateByDay(rawData);
         
-        renderBattlefieldChart(labels, friendlyData, hostileData);
+        renderBattlefieldChart(chartData);
+        loadDefaultIntelFeed();
     }
 
     async function init() {
