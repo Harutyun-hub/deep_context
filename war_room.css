@@ -77,8 +77,28 @@ body {
 
 .header-left {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 1rem;
+}
+
+.back-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.back-link:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
 }
 
 .war-room-title {
