@@ -1,0 +1,77 @@
+Master Prompt for Replit AI
+Context: The "War Room" Initiative We are building a new, advanced analytics interface called "The War Room" for our existing Competitive Intelligence SaaS ("Nimbus AI").
+
+Current State:
+
+We have a functional dashboard (dashboard.html) connected to Supabase. Do not touch or break existing files.
+
+We have a new SQL View in Supabase called intelligence_scores that aggregates complex metrics (Aggression Score, Threat Level, etc.).
+
+Goal: We are creating a new standalone page (war_room.html) that acts as a "Tactical Command Center" for marketing directors.
+
+The Product Philosophy: "Active Defense" The current dashboard is passive (just tables). The War Room is active. It answers the question "Am I safe?" in 5 seconds. It uses military/tactical aesthetics to create urgency.
+
+The Design Language: "Neon Glass"
+
+Base Style: Glassmorphism (keep the transparency/blur).
+
+The Shift: Switch from "Light/Airy" to "Dark/Cyberpunk".
+
+Background: Deep Slate/Charcoal (#0F172A).
+
+Accents: High-contrast Neon.
+
+Threat/Enemy: Glowing Crimson Red (#EF4444).
+
+Safe/Ally: Glowing Electric Blue (#3B82F6) or Emerald Green (#10B981).
+
+Vibe: Think Bloomberg Terminal meets Call of Duty HUD.
+
+Fonts: Keep Inter for headers, but strictly use JetBrains Mono or Monospace for data points/numbers.
+
+Implementation Rules:
+
+New Files Only: Create war_room.html, war_room.css, and war_room.js.
+
+Supabase: Use the existing SupabaseManager.js client but fetch data from our new intelligence_scores view.
+
+Step-by-Step: We will build this section by section. Do not hallucinate future features yet.
+
+Task 1: The Command Deck (Home View)
+Objective: Build the skeleton of the War Room and the "Hero Section" (The Command Deck).
+
+Requirements:
+
+Structure: Create the war_room.html with a dark, immersive background.
+
+The "DEFCON" Module:
+
+Fetch the threat_level ('CRITICAL', 'ELEVATED', 'SECURE') from the intelligence_scores view.
+
+Visual: A massive, central Glass card.
+
+Logic:
+
+If CRITICAL: The glass border should pulse Red. Text: "HIGH THREAT DETECTED".
+
+If SECURE: The glass border glows Green. Text: "SYSTEM SECURE".
+
+The "Aggression" Gauge:
+
+Fetch the aggression_score (0-100).
+
+Display it as a large number or semi-circle chart next to the Threat Level.
+
+The Ticker Tape:
+
+A fixed footer bar scrolling horizontally (like a stock market ticker).
+
+Display: "Live Competitor Activity..." (Mock the content for now, just get the animation right).
+
+Technical Note:
+
+Query the intelligence_scores view using supabase.from('intelligence_scores').select('*').
+
+Focus heavily on the CSS effects (backdrop-filter, box-shadows) to nail the "Neon Glass" look immediately.
+
+Let's build the Command Deck.
