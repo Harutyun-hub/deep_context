@@ -875,8 +875,8 @@
             const supabase = await SupabaseManager.getClient();
             
             const { data, error } = await supabase
-                .from('screenshots')
-                .select('id, screenshot_url, created_at')
+                .from('company_screenshots')
+                .select('id, image_url, created_at')
                 .eq('company_id', competitorCompanyId)
                 .order('created_at', { ascending: false })
                 .limit(2);
@@ -911,7 +911,7 @@
                 
                 contentEl.innerHTML = `
                     <div class="single-screenshot">
-                        <img src="${screenshot.screenshot_url}" alt="Baseline screenshot" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect fill=%22%231E293B%22 width=%22400%22 height=%22300%22/><text fill=%22%2364748B%22 x=%22200%22 y=%22150%22 text-anchor=%22middle%22 font-family=%22monospace%22>Image unavailable</text></svg>'">
+                        <img src="${screenshot.image_url}" alt="Baseline screenshot" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect fill=%22%231E293B%22 width=%22400%22 height=%22300%22/><text fill=%22%2364748B%22 x=%22200%22 y=%22150%22 text-anchor=%22middle%22 font-family=%22monospace%22>Image unavailable</text></svg>'">
                         <div class="baseline-badge">BASELINE ESTABLISHED<br/>${dateStr}</div>
                     </div>
                 `;
@@ -928,8 +928,8 @@
             
             contentEl.innerHTML = `
                 <div class="diff-slider-container" id="diffSlider">
-                    <img class="diff-image before" src="${older.screenshot_url}" alt="Before">
-                    <img class="diff-image after" src="${newer.screenshot_url}" alt="After">
+                    <img class="diff-image before" src="${older.image_url}" alt="Before">
+                    <img class="diff-image after" src="${newer.image_url}" alt="After">
                     <div class="diff-slider-handle" id="diffHandle"></div>
                     <div class="diff-labels">
                         <span class="diff-label before">BEFORE (${olderDate})</span>
