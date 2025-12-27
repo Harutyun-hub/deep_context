@@ -155,7 +155,7 @@
                         <span class="tech-radar-status" id="techRadarStatus">SCANNING...</span>
                     </div>
                     <div class="tech-radar-content" id="techRadarContent">
-                        <div class="tech-item" data-tech="meta">
+                        <div class="tech-item" data-tech="meta" id="metaPixelItem">
                             <div class="tech-icon">📘</div>
                             <div class="tech-info">
                                 <span class="tech-name">Meta Pixel</span>
@@ -163,7 +163,7 @@
                             </div>
                             <span class="tech-badge inactive" id="metaPixelBadge">NOT DETECTED</span>
                         </div>
-                        <div class="tech-item" data-tech="gtm">
+                        <div class="tech-item" data-tech="gtm" id="gtmItem">
                             <div class="tech-icon">📊</div>
                             <div class="tech-info">
                                 <span class="tech-name">GTM / GA4</span>
@@ -171,7 +171,7 @@
                             </div>
                             <span class="tech-badge inactive" id="gtmBadge">NOT DETECTED</span>
                         </div>
-                        <div class="tech-item" data-tech="tiktok">
+                        <div class="tech-item" data-tech="tiktok" id="tiktokItem">
                             <div class="tech-icon">🎵</div>
                             <div class="tech-info">
                                 <span class="tech-name">TikTok Pixel</span>
@@ -179,7 +179,7 @@
                             </div>
                             <span class="tech-badge inactive" id="tiktokBadge">NOT DETECTED</span>
                         </div>
-                        <div class="tech-item" data-tech="hotjar">
+                        <div class="tech-item" data-tech="hotjar" id="hotjarItem">
                             <div class="tech-icon">🔥</div>
                             <div class="tech-info">
                                 <span class="tech-name">Hotjar</span>
@@ -187,6 +187,12 @@
                             </div>
                             <span class="tech-badge inactive" id="hotjarBadge">NOT DETECTED</span>
                         </div>
+                    </div>
+                    <div class="other-scripts-section" id="otherScriptsSection" style="display: none;">
+                        <div class="other-scripts-header">
+                            <span class="other-scripts-label">OTHER DETECTED SCRIPTS</span>
+                        </div>
+                        <div class="other-scripts-list" id="otherScriptsList"></div>
                     </div>
                 </div>
 

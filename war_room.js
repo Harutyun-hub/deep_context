@@ -680,12 +680,26 @@
         loadDefaultIntelFeed();
     }
 
+    const MAJOR_PLATFORM_DOMAINS = [
+        'facebook', 'fbcdn', 'fb.com', 'connect.facebook.net',
+        'google', 'googletagmanager', 'googlesyndication', 'googleapis', 'gstatic',
+        'tiktok', 'tiktokcdn',
+        'hotjar',
+        'doubleclick', 'googleadservices'
+    ];
+
     async function scanTechStack() {
         const statusEl = document.getElementById('techRadarStatus');
         const metaBadge = document.getElementById('metaPixelBadge');
         const gtmBadge = document.getElementById('gtmBadge');
         const tiktokBadge = document.getElementById('tiktokBadge');
         const hotjarBadge = document.getElementById('hotjarBadge');
+        const metaItem = document.getElementById('metaPixelItem');
+        const gtmItem = document.getElementById('gtmItem');
+        const tiktokItem = document.getElementById('tiktokItem');
+        const hotjarItem = document.getElementById('hotjarItem');
+        const otherScriptsSection = document.getElementById('otherScriptsSection');
+        const otherScriptsList = document.getElementById('otherScriptsList');
         
         if (!competitorCompanyId) {
             if (statusEl) statusEl.textContent = 'AWAITING TARGET';
@@ -695,43 +709,66 @@
         if (statusEl) statusEl.textContent = 'SCANNING...';
         
         try {
-            const supabase = await SupabaseManager.getClient();
+            await SupabaseManager.initialize();
+            const supabase = SupabaseManager.getClient();
             
             const { data, error } = await supabase
                 .from('website_data')
-                .select('html_raw, created_at')
+                .select('tech_stack, created_at')
                 .eq('company_id', competitorCompanyId)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .single();
             
-            if (error || !data || !data.html_raw) {
-                log('No website data found for competitor');
+            if (error || !data || !data.tech_stack) {
+                log('No tech_stack data found for competitor');
                 if (statusEl) statusEl.textContent = 'NO DATA';
                 resetTechBadges();
+                if (otherScriptsSection) otherScriptsSection.style.display = 'none';
                 return;
             }
             
-            const html = data.html_raw.toLowerCase();
+            const techStack = data.tech_stack;
+            const hasGTM = techStack.has_gtm === true;
             
-            const hasMeta = html.includes('connect.facebook.net') || html.includes('fbevents.js');
-            const hasGTM = html.includes('googletagmanager');
-            const hasTikTok = html.includes('tiktok');
-            const hasHotjar = html.includes('hotjar');
+            const metaDirect = techStack.meta_pixel_direct === true;
+            const tiktokDirect = techStack.tiktok_pixel_direct === true;
+            const hotjarDirect = techStack.hotjar_direct === true;
             
-            updateTechBadge('meta', metaBadge, hasMeta);
-            updateTechBadge('gtm', gtmBadge, hasGTM);
-            updateTechBadge('tiktok', tiktokBadge, hasTikTok);
-            updateTechBadge('hotjar', hotjarBadge, hasHotjar);
+            updateTechBadgeGhost('meta', metaBadge, metaItem, metaDirect, hasGTM);
+            updateTechBadgeGhost('gtm', gtmBadge, gtmItem, hasGTM, false);
+            updateTechBadgeGhost('tiktok', tiktokBadge, tiktokItem, tiktokDirect, hasGTM);
+            updateTechBadgeGhost('hotjar', hotjarBadge, hotjarItem, hotjarDirect, hasGTM);
             
-            const detectedCount = [hasMeta, hasGTM, hasTikTok, hasHotjar].filter(Boolean).length;
+            let detectedCount = 0;
+            let inferredCount = 0;
+            
+            if (metaDirect) detectedCount++;
+            else if (hasGTM) inferredCount++;
+            
+            if (hasGTM) detectedCount++;
+            
+            if (tiktokDirect) detectedCount++;
+            else if (hasGTM) inferredCount++;
+            
+            if (hotjarDirect) detectedCount++;
+            else if (hasGTM) inferredCount++;
             
             if (statusEl) {
-                statusEl.textContent = `${detectedCount} DETECTED`;
-                statusEl.classList.toggle('active', detectedCount > 0);
+                let statusText = '';
+                if (detectedCount > 0) statusText += `${detectedCount} DETECTED`;
+                if (inferredCount > 0) {
+                    if (statusText) statusText += ' + ';
+                    statusText += `${inferredCount} INFERRED`;
+                }
+                if (!statusText) statusText = '0 DETECTED';
+                statusEl.textContent = statusText;
+                statusEl.classList.toggle('active', detectedCount > 0 || inferredCount > 0);
             }
             
-            log(`Tech scan complete: ${detectedCount} technologies detected`);
+            renderOtherScripts(techStack.all_external_scripts, otherScriptsSection, otherScriptsList);
+            
+            log(`Tech scan complete: ${detectedCount} detected, ${inferredCount} inferred (GTM managed)`);
             
         } catch (error) {
             log('Tech scan error: ' + error.message);
@@ -739,30 +776,80 @@
         }
     }
     
-    function updateTechBadge(techType, badgeEl, isDetected) {
+    function updateTechBadgeGhost(techType, badgeEl, itemEl, isDirect, hasGTM) {
         if (!badgeEl) return;
         
-        const techItem = badgeEl.closest('.tech-item');
+        itemEl?.classList.remove('detected', 'inferred');
         
-        if (isDetected) {
+        if (isDirect) {
             badgeEl.textContent = 'DETECTED';
             badgeEl.className = `tech-badge active ${techType}`;
-            if (techItem) techItem.classList.add('detected');
+            badgeEl.innerHTML = 'DETECTED';
+            itemEl?.classList.add('detected');
+        } else if (hasGTM && techType !== 'gtm') {
+            badgeEl.className = `tech-badge inferred ${techType}`;
+            badgeEl.innerHTML = `GTM MANAGED<span class="ghost-tooltip">Tracking is likely managed dynamically via Google Tag Manager container.</span>`;
+            itemEl?.classList.add('inferred');
         } else {
             badgeEl.textContent = 'NOT DETECTED';
             badgeEl.className = 'tech-badge inactive';
-            if (techItem) techItem.classList.remove('detected');
         }
     }
     
     function resetTechBadges() {
         const badges = ['metaPixelBadge', 'gtmBadge', 'tiktokBadge', 'hotjarBadge'];
+        const items = ['metaPixelItem', 'gtmItem', 'tiktokItem', 'hotjarItem'];
         const types = ['meta', 'gtm', 'tiktok', 'hotjar'];
         
         badges.forEach((id, index) => {
             const badge = document.getElementById(id);
-            updateTechBadge(types[index], badge, false);
+            const item = document.getElementById(items[index]);
+            updateTechBadgeGhost(types[index], badge, item, false, false);
         });
+        
+        const otherScriptsSection = document.getElementById('otherScriptsSection');
+        if (otherScriptsSection) otherScriptsSection.style.display = 'none';
+    }
+    
+    function renderOtherScripts(allScripts, sectionEl, listEl) {
+        if (!sectionEl || !listEl) return;
+        
+        if (!allScripts || !Array.isArray(allScripts) || allScripts.length === 0) {
+            sectionEl.style.display = 'none';
+            return;
+        }
+        
+        const filteredScripts = allScripts.filter(script => {
+            const lowered = script.toLowerCase();
+            return !MAJOR_PLATFORM_DOMAINS.some(domain => lowered.includes(domain));
+        });
+        
+        if (filteredScripts.length === 0) {
+            sectionEl.style.display = 'none';
+            return;
+        }
+        
+        const extractDomain = (url) => {
+            try {
+                let domain = url.replace(/^https?:\/\//, '').split('/')[0];
+                const parts = domain.split('.');
+                if (parts.length > 2) {
+                    domain = parts.slice(-2).join('.');
+                }
+                return domain;
+            } catch {
+                return url;
+            }
+        };
+        
+        const uniqueDomains = [...new Set(filteredScripts.map(extractDomain))];
+        
+        listEl.innerHTML = uniqueDomains.slice(0, 10).map(domain => 
+            `<span class="script-pill">${domain}</span>`
+        ).join('');
+        
+        sectionEl.style.display = 'block';
+        log(`Rendered ${uniqueDomains.length} unknown script domains`);
     }
 
     async function loadVisualIntercept() {
