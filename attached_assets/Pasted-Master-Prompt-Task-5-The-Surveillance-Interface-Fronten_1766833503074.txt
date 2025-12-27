@@ -1,0 +1,54 @@
+Master Prompt: Task 5 - The Surveillance Interface (Frontend Logic)
+Context: We are finalizing the "Digital Surveillance" section. Update: The database schema has been upgraded. We no longer need to parse raw HTML in the browser. The website_data table now contains a pre-calculated column named tech_stack (JSONB) that contains all the intel we need.
+
+Goal: Update the "Tech Radar" module to render badges based on this new JSON data, implementing specific "Intelligence Logic" to handle hidden tools.
+
+1. Data Integration
+
+Source: When fetching the competitor's data in scanTechStack(), select the tech_stack column from website_data.
+
+Structure: The JSON object contains keys like meta_pixel_direct, has_gtm, tracking_sophistication, and all_external_scripts.
+
+2. The UI Logic: "The Ghost Protocol" We need to visualize confidence levels, not just simple "True/False." Update the rendering logic for the technology badges (Facebook, Google, TikTok, Hotjar) to handle three states:
+
+State A: "Active" (Confirmed)
+
+Condition: If the specific direct flag is true (e.g., tech_stack.meta_pixel_direct === true).
+
+Visual: Neon Color (Bright Blue/Green/Red).
+
+Label: "DETECTED".
+
+State B: "Inferred" (The Ghost State)
+
+Condition: If the direct flag is false BUT tech_stack.has_gtm is true.
+
+Logic: Since they use Google Tag Manager, they are likely hiding the pixel inside it. We cannot confirm it, but we suspect it.
+
+Visual: Faded/Ghost Color (50% Opacity) or a Dotted Border.
+
+Label: "GTM MANAGED" or "LIKELY HIDDEN".
+
+Tooltip: Add a hover tooltip saying: "Tracking is likely managed dynamically via Google Tag Manager container."
+
+State C: "Inactive"
+
+Condition: Both direct flag and GTM are false.
+
+Visual: Grey / Dimmed.
+
+Label: "NOT DETECTED".
+
+3. The "Discovery" List (Unknown Tools) Below the main badges, add a small section called "OTHER DETECTED SCRIPTS".
+
+Logic: Take the tech_stack.all_external_scripts array (which contains a list of domains).
+
+Filter: Remove any domains that belong to the "Major Platforms" we already displayed above (e.g., filter out facebook, google, tiktok, hotjar).
+
+Render: Display the remaining domains as a simple list of "Tag" pills.
+
+Example: If the list contains cdn.unknown-crm.com, display a tag saying unknown-crm.com.
+
+Why: This reveals tools we didn't explicitly look for (like niche gambling trackers).
+
+Action: Refactor the scanTechStack function to use this tech_stack column and implement the 3-State Badge Logic (Active / Inferred / Inactive).
