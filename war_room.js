@@ -1006,11 +1006,154 @@
         });
     }
 
+    const PROMO_CATEGORIES = {
+        money: { icon: '💰', label: 'Bonus', cssClass: 'money' },
+        spins: { icon: '🎰', label: 'Spins', cssClass: 'spins' },
+        chips: { icon: '🎫', label: 'Free Bet', cssClass: 'chips' },
+        events: { icon: '🏆', label: 'Event', cssClass: 'events' }
+    };
+
+    async function loadMarketIntel() {
+        const statusEl = document.getElementById('marketIntelStatus');
+        const contentEl = document.getElementById('marketIntelContent');
+        const headlineEl = document.getElementById('marketIntelHeadline');
+        const pillsEl = document.getElementById('promoPillsContainer');
+        
+        if (!contentEl || !pillsEl) return;
+        
+        if (!competitorCompanyId) {
+            if (statusEl) statusEl.textContent = 'AWAITING TARGET';
+            if (statusEl) statusEl.className = 'market-intel-status';
+            if (headlineEl) {
+                headlineEl.textContent = '';
+                headlineEl.classList.remove('visible');
+            }
+            pillsEl.innerHTML = `
+                <div class="promo-loading">
+                    <span class="promo-loading-text">Select a target to scan promotions...</span>
+                </div>
+            `;
+            return;
+        }
+        
+        if (statusEl) {
+            statusEl.textContent = 'SCANNING...';
+            statusEl.className = 'market-intel-status';
+        }
+        
+        try {
+            await SupabaseManager.initialize();
+            const supabase = SupabaseManager.getClient();
+            
+            const { data, error } = await supabase
+                .from('website_data')
+                .select('active_promotions, created_at')
+                .eq('company_id', competitorCompanyId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            
+            if (error) {
+                log('Market intel error: ' + error.message);
+                if (statusEl) {
+                    statusEl.textContent = 'ERROR';
+                    statusEl.className = 'market-intel-status';
+                }
+                return;
+            }
+            
+            if (!data || !data.active_promotions) {
+                renderNoPromo(statusEl, headlineEl, pillsEl);
+                log('No active promotions data found');
+                return;
+            }
+            
+            const promos = data.active_promotions;
+            const offers = promos.offers || {};
+            const headline = promos.headline || null;
+            
+            const hasAnyPromo = ['money', 'spins', 'chips', 'events'].some(
+                cat => Array.isArray(offers[cat]) && offers[cat].length > 0
+            );
+            
+            if (!hasAnyPromo) {
+                renderNoPromo(statusEl, headlineEl, pillsEl);
+                log('No active offers in any category');
+                return;
+            }
+            
+            if (statusEl) {
+                statusEl.textContent = 'ACTIVE';
+                statusEl.className = 'market-intel-status active';
+            }
+            
+            if (headline && headlineEl) {
+                headlineEl.textContent = headline;
+                headlineEl.classList.add('visible');
+            } else if (headlineEl) {
+                headlineEl.textContent = '';
+                headlineEl.classList.remove('visible');
+            }
+            
+            let pillsHtml = '';
+            for (const [category, config] of Object.entries(PROMO_CATEGORIES)) {
+                const items = offers[category];
+                if (Array.isArray(items) && items.length > 0) {
+                    for (const item of items) {
+                        pillsHtml += `
+                            <span class="promo-pill ${config.cssClass}">
+                                <span class="promo-pill-icon">${config.icon}</span>
+                                <span class="promo-pill-text">${escapeHtml(item)}</span>
+                            </span>
+                        `;
+                    }
+                }
+            }
+            
+            pillsEl.innerHTML = pillsHtml;
+            
+            const totalCount = ['money', 'spins', 'chips', 'events'].reduce(
+                (sum, cat) => sum + (Array.isArray(offers[cat]) ? offers[cat].length : 0), 0
+            );
+            log(`Rendered ${totalCount} promo pills`);
+            
+        } catch (error) {
+            log('Market intel error: ' + error.message);
+            if (statusEl) statusEl.textContent = 'ERROR';
+        }
+    }
+    
+    function renderNoPromo(statusEl, headlineEl, pillsEl) {
+        if (statusEl) {
+            statusEl.textContent = 'NO PROMO';
+            statusEl.className = 'market-intel-status no-promo';
+        }
+        if (headlineEl) {
+            headlineEl.textContent = '';
+            headlineEl.classList.remove('visible');
+        }
+        if (pillsEl) {
+            pillsEl.innerHTML = `
+                <div class="no-promo-message">
+                    <span class="no-promo-icon">📭</span>
+                    <span class="no-promo-text">No Active Promo</span>
+                </div>
+            `;
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     async function loadSurveillanceData() {
         log('Loading surveillance data...');
         await Promise.all([
             scanTechStack(),
-            loadVisualIntercept()
+            loadVisualIntercept(),
+            loadMarketIntel()
         ]);
     }
 
