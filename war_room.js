@@ -1105,7 +1105,7 @@
                     for (const item of items) {
                         const rawText = String(item);
                         pillsHtml += `
-                            <span class="promo-pill ${config.cssClass}"${tooltipText ? ` title="${tooltipText}"` : ''}>
+                            <span class="promo-pill ${config.cssClass}">
                                 <span class="promo-pill-icon">${config.icon}</span>
                                 <span class="promo-pill-text">${escapeHtml(rawText)}</span>
                                 ${tooltipText ? `<span class="promo-tooltip">${tooltipText}</span>` : ''}
