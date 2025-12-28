@@ -390,6 +390,101 @@ body {
     box-shadow: var(--shadow-sm);
 }
 
+/* Threat Level Glow Effects for War Room Button */
+.nav-item.threat-high {
+    animation: threatPulseRed 1.5s ease-in-out infinite;
+    color: #DC2626;
+}
+
+.nav-item.threat-medium {
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.5), 0 0 24px rgba(245, 158, 11, 0.3);
+    color: #D97706;
+}
+
+@keyframes threatPulseRed {
+    0%, 100% {
+        box-shadow: 0 0 8px rgba(220, 38, 38, 0.4), 0 0 16px rgba(220, 38, 38, 0.2);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(220, 38, 38, 0.7), 0 0 32px rgba(220, 38, 38, 0.4), 0 0 48px rgba(220, 38, 38, 0.2);
+    }
+}
+
+/* Aggression Index HUD Badge */
+.aggression-hud {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--glass-bg-light);
+    border: 1px solid var(--glass-border-light);
+    border-radius: 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+}
+
+.aggression-hud-label {
+    color: var(--color-gray-500);
+    text-transform: uppercase;
+    font-size: 9px;
+    letter-spacing: 0.05em;
+}
+
+.aggression-hud-value {
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.aggression-hud-value.threat-low {
+    color: #10B981;
+}
+
+.aggression-hud-value.threat-medium {
+    color: #F59E0B;
+}
+
+.aggression-hud-value.threat-high {
+    color: #DC2626;
+    animation: hudPulse 2s ease-in-out infinite;
+}
+
+@keyframes hudPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.aggression-hud-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10B981;
+}
+
+.aggression-hud-dot.threat-medium {
+    background: #F59E0B;
+}
+
+.aggression-hud-dot.threat-high {
+    background: #DC2626;
+    animation: dotPulse 1s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 0 4px rgba(220, 38, 38, 0.5);
+    }
+    50% { 
+        transform: scale(1.2);
+        box-shadow: 0 0 8px rgba(220, 38, 38, 0.8);
+    }
+}
+
 .recent-chats {
     flex: 1;
     padding: 12px;
