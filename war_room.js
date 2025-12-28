@@ -852,6 +852,32 @@
         log(`Rendered ${uniqueDomains.length} unknown script domains`);
     }
 
+    function renderAiTacticalInsight(screenshot) {
+        if (!screenshot) return '';
+        
+        const hasAiData = screenshot.promotions_detected === true || 
+                          (screenshot.ai_analysis && screenshot.ai_analysis.trim() !== '');
+        
+        if (!hasAiData) return '';
+        
+        const headline = screenshot.marketing_intent || 'Marketing Strategy Detected';
+        const subtext = screenshot.ai_analysis || 'AI analysis pending...';
+        
+        return `
+            <div class="ai-tactical-insight">
+                <div class="ai-insight-header">
+                    <span class="ai-insight-icon">🤖</span>
+                    <span class="ai-insight-title">AI VISION ANALYSIS</span>
+                    <span class="ai-insight-pulse"></span>
+                </div>
+                <div class="ai-insight-content">
+                    <div class="ai-insight-headline">${escapeHtml(headline)}</div>
+                    <div class="ai-insight-subtext">${escapeHtml(subtext)}</div>
+                </div>
+            </div>
+        `;
+    }
+
     async function loadVisualIntercept() {
         const contentEl = document.getElementById('visualInterceptContent');
         const statusEl = document.getElementById('visualInterceptStatus');
@@ -876,7 +902,7 @@
             
             const { data, error } = await supabase
                 .from('company_screenshots')
-                .select('id, image_url, created_at')
+                .select('id, image_url, created_at, ai_analysis, marketing_intent, promotions_detected')
                 .eq('company_id', competitorCompanyId)
                 .order('created_at', { ascending: false })
                 .limit(2);
@@ -909,11 +935,14 @@
                     month: 'short', day: 'numeric', year: 'numeric' 
                 });
                 
+                const aiInsightHtml = renderAiTacticalInsight(screenshot);
+                
                 contentEl.innerHTML = `
                     <div class="single-screenshot">
                         <img src="${screenshot.image_url}" alt="Baseline screenshot" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect fill=%22%231E293B%22 width=%22400%22 height=%22300%22/><text fill=%22%2364748B%22 x=%22200%22 y=%22150%22 text-anchor=%22middle%22 font-family=%22monospace%22>Image unavailable</text></svg>'">
                         <div class="baseline-badge">BASELINE ESTABLISHED<br/>${dateStr}</div>
                     </div>
+                    ${aiInsightHtml}
                 `;
                 log('Single screenshot found - showing baseline');
                 return;
@@ -926,6 +955,8 @@
             const newerDate = new Date(newer.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const olderDate = new Date(older.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             
+            const aiInsightHtml = renderAiTacticalInsight(newer);
+            
             contentEl.innerHTML = `
                 <div class="diff-slider-container" id="diffSlider">
                     <img class="diff-image before" src="${older.image_url}" alt="Before">
@@ -936,6 +967,7 @@
                         <span class="diff-label after">AFTER (${newerDate})</span>
                     </div>
                 </div>
+                ${aiInsightHtml}
             `;
             
             initDiffSlider();

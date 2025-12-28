@@ -1548,6 +1548,98 @@ body {
     text-align: center;
 }
 
+/* AI Tactical Insight Panel */
+.ai-tactical-insight {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    box-shadow: 
+        0 0 20px rgba(59, 130, 246, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    animation: aiInsightGlow 3s ease-in-out infinite;
+}
+
+@keyframes aiInsightGlow {
+    0%, 100% {
+        box-shadow: 
+            0 0 20px rgba(59, 130, 246, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+    50% {
+        box-shadow: 
+            0 0 30px rgba(59, 130, 246, 0.2),
+            0 0 60px rgba(59, 130, 246, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+}
+
+.ai-insight-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.ai-insight-icon {
+    font-size: 1rem;
+}
+
+.ai-insight-title {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: #60A5FA;
+    text-transform: uppercase;
+}
+
+.ai-insight-pulse {
+    width: 8px;
+    height: 8px;
+    background: #10B981;
+    border-radius: 50%;
+    margin-left: auto;
+    animation: aiPulse 2s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+@keyframes aiPulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(0.9);
+        box-shadow: 0 0 16px rgba(16, 185, 129, 0.8);
+    }
+}
+
+.ai-insight-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.ai-insight-headline {
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.ai-insight-subtext {
+    font-family: var(--font-primary);
+    font-size: 0.8125rem;
+    font-style: italic;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
 .market-intel {
     display: flex;
     flex-direction: column;
