@@ -43,6 +43,7 @@ body.dashboard-page .sidebar-footer {
 }
 
 .dashboard-header {
+    position: relative;
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     background: var(--glass-bg);

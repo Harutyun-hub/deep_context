@@ -113,15 +113,15 @@
 
         valueEl.classList.remove('low', 'medium', 'high');
 
-        if (clampedScore <= 33) {
+        if (clampedScore < 30) {
             valueEl.classList.add('low');
-            descriptionEl.textContent = 'Low competitive pressure. Market position stable.';
-        } else if (clampedScore <= 66) {
+            descriptionEl.textContent = 'Low 🟢 - Quiet market. Position stable.';
+        } else if (clampedScore <= 65) {
             valueEl.classList.add('medium');
-            descriptionEl.textContent = 'Moderate competitor activity. Stay vigilant.';
+            descriptionEl.textContent = 'Moderate 👀 - Active competitor movements. Stay vigilant.';
         } else {
             valueEl.classList.add('high');
-            descriptionEl.textContent = 'High aggression detected. Defensive measures recommended.';
+            descriptionEl.textContent = 'HIGH 🔥 - Critical warning. Defensive measures recommended.';
         }
     }
 

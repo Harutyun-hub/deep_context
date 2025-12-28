@@ -102,7 +102,7 @@
                     </div>
                     <div class="aggression-hud" id="aggressionHud" style="display: none;">
                         <span class="aggression-hud-dot" id="aggressionDot"></span>
-                        <span class="aggression-hud-label">AGGRESSION</span>
+                        <span class="aggression-hud-label">COMPETITOR ACTIVITY</span>
                         <span class="aggression-hud-value" id="aggressionValue">--</span>
                     </div>
                     <div class="header-actions">
@@ -566,12 +566,15 @@
                     }
                 }
                 
-                // Determine threat level
+                // Determine threat level with stricter thresholds
                 let threatLevel = 'low';
-                if (aggressionScore > 75) {
+                let stateText = 'Low 🟢 · ' + aggressionScore + '%';
+                if (aggressionScore > 65) {
                     threatLevel = 'high';
-                } else if (aggressionScore > 40) {
+                    stateText = 'HIGH 🔥 · ' + aggressionScore + '%';
+                } else if (aggressionScore >= 30) {
                     threatLevel = 'medium';
+                    stateText = 'Moderate 👀 · ' + aggressionScore + '%';
                 }
                 
                 // Update War Room button glow
@@ -591,14 +594,12 @@
                 const dotEl = document.getElementById('aggressionDot');
                 
                 if (hudEl && valueEl && dotEl) {
-                    valueEl.textContent = aggressionScore + '%';
+                    valueEl.textContent = stateText;
                     valueEl.classList.remove('threat-low', 'threat-medium', 'threat-high');
-                    dotEl.classList.remove('threat-medium', 'threat-high');
+                    dotEl.classList.remove('threat-low', 'threat-medium', 'threat-high');
                     
                     valueEl.classList.add('threat-' + threatLevel);
-                    if (threatLevel !== 'low') {
-                        dotEl.classList.add('threat-' + threatLevel);
-                    }
+                    dotEl.classList.add('threat-' + threatLevel);
                     
                     hudEl.style.display = 'flex';
                 }
