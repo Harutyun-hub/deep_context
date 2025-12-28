@@ -46,6 +46,8 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Rich Content Display**: AI responses support rich text, interactive charts, tables, and media galleries.
 - **Competitive Intelligence Suite**: 4-pillar strategic dashboard for market analysis, engagement trends, creative strategy, and website tracking.
 - **War Room**: Tactical Command Center displaying DEFCON threat levels, aggression gauge, live competitor activity ticker, Mission Control for company vs. competitor selection (TotoGaming Protocol default), and "Stacked Frontline" Battlefield chart showing 30-day marketing activity timeline with 4 datasets (Paid vs Organic for both sides) and Live Intel Feed sidebar displaying actual competitor creatives on hover.
+- **Live Threat Telemetry**: Real-time threat level indicators across all pages - War Room sidebar button pulses red (high threat >75%) or glows yellow (medium threat 41-75%), and an "AGGRESSION: X%" HUD badge appears in the header with color-coded status (green/yellow/red). Data sourced from `intelligence_scores` view with fallback to `website_data` activity density.
+- **AI Vision Analysis**: Visual Intercept section displays AI-analyzed screenshots with "AI Tactical Insight" panel showing marketing intent headline and AI analysis subtext when `promotions_detected=true` or `ai_analysis` exists.
 
 ## External Dependencies
 - **Supabase**: User authentication (Google OAuth), PostgreSQL database, and Row Level Security.

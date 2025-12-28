@@ -537,8 +537,8 @@
             await signOut();
         });
         
-        // Live Threat Telemetry - runs async without blocking page load
-        (async function fetchThreatLevel() {
+        // Live Threat Telemetry - runs after a brief delay to ensure Supabase is ready
+        setTimeout(async function loadThreatTelemetry() {
             try {
                 const supabase = await SupabaseManager.getClient();
                 
@@ -608,7 +608,7 @@
             } catch (error) {
                 console.warn('Threat telemetry failed (non-blocking):', error.message);
             }
-        })();
+        }, 500);
     </script>
 </body>
 </html>

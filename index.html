@@ -195,6 +195,9 @@
                     
                     console.log('✓ Auth complete, initializing chat...');
                     await initializeChat();
+                    
+                    // Load threat telemetry after auth is complete
+                    loadThreatTelemetry();
                 }
             } catch (error) {
                 console.error('Auth check failed:', error);
@@ -250,8 +253,8 @@
             sidebar.classList.toggle('collapsed');
         });
         
-        // Live Threat Telemetry - runs async without blocking page load
-        (async function fetchThreatLevel() {
+        // Live Threat Telemetry - called after auth is complete
+        async function loadThreatTelemetry() {
             try {
                 const supabase = await SupabaseManager.getClient();
                 
@@ -322,7 +325,7 @@
             } catch (error) {
                 console.warn('Threat telemetry failed (non-blocking):', error.message);
             }
-        })();
+        }
     </script>
 </body>
 </html>
