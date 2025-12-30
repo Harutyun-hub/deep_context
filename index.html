@@ -167,6 +167,7 @@
     <script src="logger.js"></script>
     <script src="utils.js"></script>
     <script src="SupabaseManager.js"></script>
+    <script src="intelligenceUtils.js"></script>
     <script src="QueryCache.js"></script>
     <script src="message-renderer.js"></script>
     <script src="config.js"></script>
@@ -253,48 +254,21 @@
             sidebar.classList.toggle('collapsed');
         });
         
-        // Live Threat Telemetry - called after auth is complete
         async function loadThreatTelemetry() {
             try {
-                const supabase = await SupabaseManager.getClient();
+                const threatData = await IntelligenceUtils.calculateThreatLevel();
+                const aggressionScore = threatData.score;
                 
-                // Try to get aggression score from intelligence_scores view first
-                const { data: scoreData, error: scoreError } = await supabase
-                    .from('intelligence_scores')
-                    .select('aggression_score')
-                    .limit(1)
-                    .single();
-                
-                let aggressionScore = 0;
-                
-                if (!scoreError && scoreData?.aggression_score) {
-                    aggressionScore = parseInt(scoreData.aggression_score) || 0;
-                } else {
-                    // Fallback: count recent website_data entries (activity density)
-                    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-                    const { count, error: countError } = await supabase
-                        .from('website_data')
-                        .select('*', { count: 'exact', head: true })
-                        .gte('scanned_at', twentyFourHoursAgo);
-                    
-                    if (!countError && count !== null) {
-                        // Convert activity count to 0-100 scale (max at 50 activities = 100%)
-                        aggressionScore = Math.min(100, Math.round((count / 50) * 100));
-                    }
-                }
-                
-                // Determine threat level with stricter thresholds
                 let threatLevel = 'low';
                 let stateText = 'Low 🟢 · ' + aggressionScore + '%';
-                if (aggressionScore > 65) {
+                if (threatData.status === 'CRITICAL') {
                     threatLevel = 'high';
                     stateText = 'HIGH 🔥 · ' + aggressionScore + '%';
-                } else if (aggressionScore >= 30) {
+                } else if (threatData.status === 'ELEVATED') {
                     threatLevel = 'medium';
                     stateText = 'Moderate 👀 · ' + aggressionScore + '%';
                 }
                 
-                // Update War Room button glow
                 const warRoomBtn = document.getElementById('warRoomNavBtn');
                 if (warRoomBtn) {
                     warRoomBtn.classList.remove('threat-high', 'threat-medium');
@@ -305,7 +279,6 @@
                     }
                 }
                 
-                // Update HUD badge
                 const hudEl = document.getElementById('aggressionHud');
                 const valueEl = document.getElementById('aggressionValue');
                 const dotEl = document.getElementById('aggressionDot');
@@ -321,7 +294,7 @@
                     hudEl.style.display = 'flex';
                 }
                 
-                console.log('✓ Threat telemetry loaded:', { aggressionScore, threatLevel });
+                console.log('✓ Threat telemetry loaded:', { aggressionScore, threatLevel, status: threatData.status });
                 
             } catch (error) {
                 console.warn('Threat telemetry failed (non-blocking):', error.message);

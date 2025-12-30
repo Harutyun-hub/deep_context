@@ -113,10 +113,10 @@
 
         valueEl.classList.remove('low', 'medium', 'high');
 
-        if (clampedScore < 30) {
+        if (clampedScore <= 30) {
             valueEl.classList.add('low');
             descriptionEl.textContent = 'Low 🟢 - Quiet market. Position stable.';
-        } else if (clampedScore <= 65) {
+        } else if (clampedScore <= 70) {
             valueEl.classList.add('medium');
             descriptionEl.textContent = 'Moderate 👀 - Active competitor movements. Stay vigilant.';
         } else {
@@ -152,13 +152,14 @@
 
     async function refreshDashboard() {
         try {
-            const data = await fetchIntelligenceData();
+            const threatData = await IntelligenceUtils.calculateThreatLevel();
             
-            updateDefconModule(data.threat_level);
-            updateAggressionGauge(data.aggression_score);
+            updateDefconModule(threatData.status);
+            updateAggressionGauge(threatData.score);
             updateLastScanTime();
             
             setConnectionStatus('connected', 'LIVE');
+            log('Dashboard refreshed with weighted threat calculation', threatData);
             
         } catch (error) {
             console.error('Dashboard refresh failed:', error);
