@@ -1,7 +1,7 @@
-# MyChatbot - Modern Chat Interface
+# Deep Context - Modern Chat Interface
 
 ## Overview
-MyChatbot is a sleek, modern web-based chat application featuring an Apple-inspired glassmorphism design. It aims to provide a seamless multi-user chat experience with robust authentication, message persistence, and AI integration. A key feature is an analytics dashboard for comprehensive data visualization of ad campaigns across multiple platforms, alongside a "War Room" for tactical competitive intelligence.
+Deep Context is a sleek, modern web-based chat application featuring an Apple-inspired glassmorphism design. It aims to provide a seamless multi-user chat experience with robust authentication, message persistence, and AI integration. A key feature is an analytics dashboard for comprehensive data visualization of ad campaigns across multiple platforms, alongside a "War Room" for tactical competitive intelligence.
 
 ## User Preferences
 - Clean, modern, classy interface
@@ -54,4 +54,4 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Supabase**: User authentication (Google OAuth), PostgreSQL database, and Row Level Security.
 - **n8n**: AI backend for contextual responses and Redis for AI conversation memory.
 - **Chart.js 4.4.1**: Interactive charts for AI responses and the analytics dashboard.
-- **Google Fonts**: Inter, JetBrains Mono for typography.
+- **Typography**: Space Grotesk (variable font, locally hosted) for login page; Inter and JetBrains Mono via Google Fonts for other pages.
