@@ -723,15 +723,27 @@
             await SupabaseManager.initialize();
             const supabase = SupabaseManager.getClient();
             
+            console.log('[Tech Radar] Fetching data for company:', competitorCompanyId);
+            
             const { data, error } = await supabase
                 .from('website_data')
                 .select('tech_stack, created_at')
                 .eq('company_id', competitorCompanyId)
                 .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+                .limit(1);
             
-            if (error || !data || !data.tech_stack) {
+            console.log('[Tech Radar] Query result:', { data, error });
+            
+            if (error) {
+                console.error('[Tech Radar] Query error:', error);
+                log('Tech radar query error: ' + error.message);
+                if (statusEl) statusEl.textContent = 'ERROR';
+                resetTechBadges();
+                return;
+            }
+            
+            if (!data || data.length === 0) {
+                console.log('[Tech Radar] No data found for company');
                 log('No tech_stack data found for competitor');
                 if (statusEl) statusEl.textContent = 'NO DATA';
                 resetTechBadges();
@@ -739,13 +751,25 @@
                 return;
             }
             
-            let techStack = data.tech_stack;
+            const record = data[0];
+            console.log('[Tech Radar] Record found:', record);
+            
+            if (!record.tech_stack) {
+                console.log('[Tech Radar] tech_stack is null/undefined');
+                if (statusEl) statusEl.textContent = 'NO DATA';
+                resetTechBadges();
+                return;
+            }
+            
+            let techStack = record.tech_stack;
+            console.log('[Tech Radar] Raw tech_stack type:', typeof techStack, techStack);
             
             if (typeof techStack === 'string') {
                 try {
                     techStack = JSON.parse(techStack);
+                    console.log('[Tech Radar] Parsed tech_stack:', techStack);
                 } catch (e) {
-                    console.error("JSON Parse Error", e);
+                    console.error('[Tech Radar] JSON Parse Error:', e);
                     log('Failed to parse tech_stack JSON');
                     if (statusEl) statusEl.textContent = 'PARSE ERROR';
                     return;
@@ -753,10 +777,11 @@
             }
             
             const hasGTM = techStack.has_gtm === true;
-            
             const metaDirect = techStack.meta_pixel_direct === true;
             const tiktokDirect = techStack.tiktok_pixel_direct === true;
             const hotjarDirect = techStack.hotjar_direct === true;
+            
+            console.log('[Tech Radar] Flags:', { hasGTM, metaDirect, tiktokDirect, hotjarDirect });
             
             updateTechBadgeGhost('meta', metaBadge, metaItem, metaDirect, hasGTM);
             updateTechBadgeGhost('gtm', gtmBadge, gtmItem, hasGTM, false);
@@ -777,6 +802,8 @@
             if (hotjarDirect) detectedCount++;
             else if (hasGTM) inferredCount++;
             
+            console.log('[Tech Radar] Counts:', { detectedCount, inferredCount });
+            
             if (statusEl) {
                 let statusText = '';
                 if (detectedCount > 0) statusText += `${detectedCount} DETECTED`;
@@ -794,6 +821,7 @@
             log(`Tech scan complete: ${detectedCount} detected, ${inferredCount} inferred (GTM managed)`);
             
         } catch (error) {
+            console.error('[Tech Radar] Catch error:', error);
             log('Tech scan error: ' + error.message);
             if (statusEl) statusEl.textContent = 'ERROR';
         }
