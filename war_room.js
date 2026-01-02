@@ -155,6 +155,7 @@
         updateDefconModule(cachedData.status);
         updateAggressionGauge(cachedData.score);
         updateLastScanTime();
+        setConnectionStatus('syncing', 'SYNCING');
         log('Dashboard rendered with cached data', cachedData);
 
         try {
