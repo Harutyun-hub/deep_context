@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In - Deep Context</title>
-    <link rel="icon" type="image/png" href="attached_assets/deep_context_logo_1767379063847.png">
-    <link rel="preload" as="image" href="attached_assets/deep_context_logo_1767379063847.png" fetchpriority="high">
+    <link rel="icon" type="image/png" href="attached_assets/Deep_context_logo_small_1767380144359.png">
+    <link rel="preload" as="image" href="attached_assets/Deep_context_logo_small_1767380144359.png" fetchpriority="high">
     <style>
         @font-face {
             font-family: 'Space Grotesk';
@@ -99,28 +99,19 @@
         }
 
         .logo {
-            width: 72px;
-            height: 72px;
+            width: 80px;
+            height: 80px;
             margin: 0 auto 24px;
             border-radius: 20px;
-            background: rgba(30, 30, 30, 0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 
-                0 4px 16px rgba(0, 0, 0, 0.3),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
             overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
         }
 
         .logo img {
-            width: 48px;
-            height: 48px;
-            object-fit: contain;
-            border-radius: 12px;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 20px;
         }
 
         h1 {
@@ -301,28 +292,23 @@
             }
 
             .logo {
-                width: 64px;
-                height: 64px;
-            }
-
-            .logo img {
-                width: 42px;
-                height: 42px;
+                width: 72px;
+                height: 72px;
             }
         }
     </style>
 </head>
 <body>
     <div class="video-bg">
-        <video autoplay muted loop playsinline>
-            <source src="attached_assets/66efbc5d-dcba-4fcb-b515-0e8b3fd3f044_1767378917777.mp4" type="video/mp4">
+        <video autoplay muted loop playsinline preload="auto">
+            <source src="attached_assets/66efbc5d-dcba-4fcb-b515-0e8b3fd3f044_(1)_1767379929084.mp4" type="video/mp4">
         </video>
     </div>
     <div class="video-overlay"></div>
 
     <div class="login-container">
         <div class="logo">
-            <img src="attached_assets/deep_context_logo_1767379063847.png" alt="Deep Context">
+            <img src="attached_assets/Deep_context_logo_small_1767380144359.png" alt="Deep Context">
         </div>
         <h1>Welcome to Deep Context</h1>
         <p class="subtitle">Sign in to access your conversations</p>
