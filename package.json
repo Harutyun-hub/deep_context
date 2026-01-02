@@ -6,6 +6,7 @@
     "push": "node push-to-github.js"
   },
   "dependencies": {
-    "@octokit/rest": "^22.0.0"
+    "@octokit/rest": "^22.0.0",
+    "@supabase/supabase-js": "^2.89.0"
   }
 }
