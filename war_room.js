@@ -742,7 +742,14 @@
             let techStack = data.tech_stack;
             
             if (typeof techStack === 'string') {
-                techStack = JSON.parse(techStack);
+                try {
+                    techStack = JSON.parse(techStack);
+                } catch (e) {
+                    console.error("JSON Parse Error", e);
+                    log('Failed to parse tech_stack JSON');
+                    if (statusEl) statusEl.textContent = 'PARSE ERROR';
+                    return;
+                }
             }
             
             const hasGTM = techStack.has_gtm === true;
