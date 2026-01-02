@@ -739,7 +739,12 @@
                 return;
             }
             
-            const techStack = data.tech_stack;
+            let techStack = data.tech_stack;
+            
+            if (typeof techStack === 'string') {
+                techStack = JSON.parse(techStack);
+            }
+            
             const hasGTM = techStack.has_gtm === true;
             
             const metaDirect = techStack.meta_pixel_direct === true;
@@ -893,6 +898,8 @@
         `;
     }
 
+    let timeGliderScreenshots = [];
+    
     async function loadVisualIntercept() {
         const contentEl = document.getElementById('visualInterceptContent');
         const statusEl = document.getElementById('visualInterceptStatus');
@@ -920,7 +927,7 @@
                 .select('id, image_url, created_at, ai_analysis, marketing_intent, promotions_detected')
                 .eq('company_id', competitorCompanyId)
                 .order('created_at', { ascending: false })
-                .limit(2);
+                .limit(7);
             
             if (error) {
                 log('Visual intercept error: ' + error.message);
@@ -941,52 +948,38 @@
                 return;
             }
             
-            if (data.length === 1) {
-                statusEl.textContent = 'BASELINE';
-                statusEl.className = 'visual-intercept-status baseline';
-                
-                const screenshot = data[0];
-                const dateStr = new Date(screenshot.created_at).toLocaleDateString('en-US', { 
-                    month: 'short', day: 'numeric', year: 'numeric' 
-                });
-                
-                const aiInsightHtml = renderAiTacticalInsight(screenshot);
-                
-                contentEl.innerHTML = `
-                    <div class="single-screenshot">
-                        <img src="${screenshot.image_url}" alt="Baseline screenshot" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect fill=%22%231E293B%22 width=%22400%22 height=%22300%22/><text fill=%22%2364748B%22 x=%22200%22 y=%22150%22 text-anchor=%22middle%22 font-family=%22monospace%22>Image unavailable</text></svg>'">
-                        <div class="baseline-badge">BASELINE ESTABLISHED<br/>${dateStr}</div>
-                    </div>
-                    ${aiInsightHtml}
-                `;
-                log('Single screenshot found - showing baseline');
-                return;
-            }
+            timeGliderScreenshots = data.reverse();
+            const latestIndex = timeGliderScreenshots.length - 1;
+            const latestScreenshot = timeGliderScreenshots[latestIndex];
             
-            statusEl.textContent = 'COMPARING';
-            statusEl.className = 'visual-intercept-status comparing';
+            statusEl.textContent = 'TIME GLIDER';
+            statusEl.className = 'visual-intercept-status active';
             
-            const [newer, older] = data;
-            const newerDate = new Date(newer.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            const olderDate = new Date(older.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const dateStr = new Date(latestScreenshot.created_at).toLocaleDateString('en-US', { 
+                month: 'short', day: 'numeric' 
+            });
             
-            const aiInsightHtml = renderAiTacticalInsight(newer);
+            const aiInsightHtml = renderAiTacticalInsight(latestScreenshot);
             
             contentEl.innerHTML = `
-                <div class="diff-slider-container" id="diffSlider">
-                    <img class="diff-image before" src="${older.image_url}" alt="Before">
-                    <img class="diff-image after" src="${newer.image_url}" alt="After">
-                    <div class="diff-slider-handle" id="diffHandle"></div>
-                    <div class="diff-labels">
-                        <span class="diff-label before">BEFORE (${olderDate})</span>
-                        <span class="diff-label after">AFTER (${newerDate})</span>
+                <div class="time-glider-container">
+                    <div class="time-glider-image-wrapper">
+                        <img id="timeGliderImage" class="time-glider-image" src="${latestScreenshot.image_url}" alt="Screenshot" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect fill=%22%231E293B%22 width=%22400%22 height=%22300%22/><text fill=%22%2364748B%22 x=%22200%22 y=%22150%22 text-anchor=%22middle%22 font-family=%22monospace%22>Image unavailable</text></svg>'">
+                        <div class="time-glider-date-badge" id="timeGliderDate">${dateStr}</div>
+                    </div>
+                    <div class="time-glider-scrubber">
+                        <input type="range" id="timeGliderSlider" class="time-glider-slider" min="0" max="${latestIndex}" value="${latestIndex}" step="1">
+                        <div class="time-glider-track-labels">
+                            <span class="track-label oldest">OLDEST</span>
+                            <span class="track-label newest">NEWEST</span>
+                        </div>
                     </div>
                 </div>
-                ${aiInsightHtml}
+                <div id="timeGliderAiInsight">${aiInsightHtml}</div>
             `;
             
-            initDiffSlider();
-            log('Two screenshots found - diff slider initialized');
+            initTimeGlider();
+            log(`Time Glider initialized with ${timeGliderScreenshots.length} screenshots`);
             
         } catch (error) {
             log('Visual intercept error: ' + error.message);
@@ -994,62 +987,28 @@
         }
     }
     
-    function initDiffSlider() {
-        const container = document.getElementById('diffSlider');
-        const handle = document.getElementById('diffHandle');
-        const afterImage = container?.querySelector('.diff-image.after');
+    function initTimeGlider() {
+        const slider = document.getElementById('timeGliderSlider');
+        const image = document.getElementById('timeGliderImage');
+        const dateBadge = document.getElementById('timeGliderDate');
+        const aiInsightContainer = document.getElementById('timeGliderAiInsight');
         
-        if (!container || !handle || !afterImage) return;
+        if (!slider || !image || !dateBadge || !aiInsightContainer) return;
         
-        let isDragging = false;
-        
-        function updateSlider(clientX) {
-            const rect = container.getBoundingClientRect();
-            let position = ((clientX - rect.left) / rect.width) * 100;
-            position = Math.max(0, Math.min(100, position));
+        slider.addEventListener('input', (e) => {
+            const index = parseInt(e.target.value, 10);
+            const screenshot = timeGliderScreenshots[index];
             
-            handle.style.left = `${position}%`;
-            afterImage.style.clipPath = `inset(0 ${100 - position}% 0 0)`;
-        }
-        
-        handle.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            e.preventDefault();
-        });
-        
-        container.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            updateSlider(e.clientX);
-        });
-        
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                updateSlider(e.clientX);
-            }
-        });
-        
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-        });
-        
-        handle.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            e.preventDefault();
-        });
-        
-        container.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            updateSlider(e.touches[0].clientX);
-        });
-        
-        document.addEventListener('touchmove', (e) => {
-            if (isDragging && e.touches.length > 0) {
-                updateSlider(e.touches[0].clientX);
-            }
-        });
-        
-        document.addEventListener('touchend', () => {
-            isDragging = false;
+            if (!screenshot) return;
+            
+            image.src = screenshot.image_url;
+            
+            const dateStr = new Date(screenshot.created_at).toLocaleDateString('en-US', { 
+                month: 'short', day: 'numeric' 
+            });
+            dateBadge.textContent = dateStr;
+            
+            aiInsightContainer.innerHTML = renderAiTacticalInsight(screenshot);
         });
     }
 
