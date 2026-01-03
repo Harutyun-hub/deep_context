@@ -849,7 +849,7 @@ body {
 .welcome-gravity-logo {
     width: 140px;
     height: auto;
-    margin-bottom: 32px;
+    margin-bottom: 16px;
     object-fit: contain;
 }
 
