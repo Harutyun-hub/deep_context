@@ -1,0 +1,37 @@
+I am reverting to my original `dashboard.js` architecture (separate loaders for Facebook, Google, Instagram), but I need to fix a critical data loss issue where valid data is not showing up.
+
+### THE PROBLEM
+Currently, the dashboard queries filter by the Ad's "Launch Date" (e.g., `start_date_string` or `first_show`).
+**The Issue:** My scraper runs **Today**, but it finds ads that launched **2 months ago**.
+- The Dashboard filters for "Today".
+- The Ad's launch date is "Nov 2025".
+- **Result:** The data is hidden (Missing Data).
+
+### THE TASK
+Refactor the three loader functions (`loadFacebookAds`, `loadGoogleAds`, `loadInstagramPosts`) to filter by the **Scrape Date** (`snapshot_date`) so that all data captured today appears, regardless of when the ad launched.
+
+**1. Update `loadFacebookAds`:**
+- **Filter Column:** Change `.gte('start_date_string', ...)` to `.gte('snapshot_date', ...)` (and `.lte`).
+- **Ordering:** Order by `snapshot_date` descending.
+- **Missing Data Fix:** If `snapshot_date` is missing for some rows, include them or fallback to `created_at`.
+
+**2. Update `loadGoogleAds`:**
+- **Filter Column:** Change `.gte('first_show', ...)` to `.gte('snapshot_date', ...)` (and `.lte`).
+- **Ordering:** Order by `snapshot_date` descending.
+
+**3. Update `loadInstagramPosts`:**
+- Verify which column represents the "Ingestion Time" (likely `created_at` or `snapshot_date`) and filter by that.
+
+**4. Data Robustness (Fixing "Partial" Breaks):**
+- **Null Checks:** Ensure that if `ad_image_url` or `page_name` is null, the code does NOT crash or hide the row. Provide default empty strings or placeholders.
+- **Console Logs:** You MUST add `console.log` inside each loader showing:
+  `console.log('[Facebook] Filter range:', filters.dateFrom, 'to', filters.dateTo);`
+  `console.log('[Facebook] Rows found:', data?.length);`
+  This allows me to debug exactly why data might still be missing.
+
+**Constraints:**
+- Do NOT change the `updateTableUI` function or HTML.
+- Keep the `!inner` join on `companies` to maintain the company filter.
+- Keep the Promise.all pattern.
+
+Please generate the corrected code for the loader functions.
