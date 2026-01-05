@@ -1,0 +1,57 @@
+I need you to refactor the frontend logic in `war_room.js` and `intelligenceUtils.js` to align with a major backend architectural change. We have moved from a complex multi-table query system to a streamlined "Dumb Pipe" architecture using a single SQL View called `intel_events`.
+
+### CONTEXT & CURRENT STATE ANALYSIS
+Based on a code audit, here is how the application currently functions:
+1. **Data Sources:** Currently queries `intel_events`, `company_screenshots`, and `companies` separately.
+2. **Threat Score (`intelligenceUtils.js`):** Currently performs 3 parallel fetches (Events, Screenshots, and RPC stats) and manually scans text for keywords like "RON" or "BONUS".
+3. **Timeline (`war_room.js`):** Fetches `battlefieldRawData` separately from the threat score.
+4. **Hardcoded Values:** There is a constant `TOTOGAMING_ID` on line 6. **THIS MUST REMAIN UNTOUCHED.**
+
+### NEW ARCHITECTURE (THE SOURCE OF TRUTH)
+You will no longer query `company_screenshots` or filter `intel_events` by distinct tables. All data now resides in a single Master View: `intel_events`.
+
+**New `intel_events` Schema Columns:**
+- `event_type` (ENUM):
+  - `'NEW_AD_LAUNCH'` (Paid Ad)
+  - `'SOCIAL_POST'` (Organic Social)
+  - `'PROMO_DETECTED'` (Website Screenshot with AI-verified offer)
+  - `'SCREENSHOT_CAPTURED'` (Standard Website Screenshot)
+- `severity`, `headline`, `company_name`, `created_at`, `image_url`
+
+---
+
+### IMPLEMENTATION TASKS
+
+#### TASK 1: Refactor Threat Assessment (`intelligenceUtils.js`)
+Update `calculateThreatLevel()` to use the new single-source logic.
+1. **Data Fetching:** Remove the `Promise.all` array that fetches screenshots separately. Perform a **single query** to `intel_events` for records where `created_at` >= startOfDay.
+   - *Note:* Keep the `client.rpc("get_ad_velocity_stats")` call; that is still required.
+2. **Ad Velocity Logic:** Filter the fetched events for `'NEW_AD_LAUNCH'` and compare against the historical average (logic remains same).
+3. **Visual Context Logic (Updated):** - Remove all manual text scanning/keyword matching (e.g., "RON", "BONUS").
+   - Instead, simply filter for `event_type === 'PROMO_DETECTED'`.
+   - If a promo is detected, set `visualScore = 40`.
+   - If only `'SCREENSHOT_CAPTURED'` exists, set `visualScore = 10`.
+
+#### TASK 2: Refactor Tactical Timeline (`war_room.js`)
+Update `fetchBattlefieldData()` to map the new ENUMs to the chart structure.
+1. **Query:** Fetch `intel_events` for the last 30 days.
+2. **Data Mapping:**
+   - IF `NEW_AD_LAUNCH` → set `type: 'paid'`, `source: 'ad'`.
+   - IF `SOCIAL_POST` → set `type: 'organic'`, `source: 'social'`.
+   - IF `PROMO_DETECTED` OR `SCREENSHOT_CAPTURED` → set `type: 'organic'`, `source: 'creative'`.
+   - *Crucial:* If `PROMO_DETECTED`, set `isImportant: true`.
+
+#### TASK 3: UI & Icon Updates (`war_room.js`)
+Update `renderIntelCard(item)` to handle the new event types.
+1. **Icon Mapping:**
+   - `'PROMO_DETECTED'` → '🎁'
+   - `'SCREENSHOT_CAPTURED'` → '📸'
+2. **Labels:** Ensure the sidebar displays "PROMO FOUND" or "VISUAL UPDATE" for these events.
+
+### CRITICAL CONSTRAINTS
+1. **Preserve Constants:** Do NOT modify or remove `const TOTOGAMING_ID` on line 6.
+2. **Preserve Dependencies:** Do not alter `SupabaseManager` initialization or the global `battlefieldChart` instance logic.
+3. **Filter Logic:** Ensure all queries continue to respect `primaryCompanyId` and `competitorCompanyId` where applicable in `war_room.js`.
+4. **Scope:** Only modify the data fetching and mapping logic; do not rewrite the chart rendering library code.
+
+Please generate the corrected code for `fetchBattlefieldData`, `renderIntelCard`, and `calculateThreatLevel`.
