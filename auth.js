@@ -115,35 +115,14 @@ async function _performAuthInit() {
 }
 
 function markAuthSettling() {
-    authSettling = true;
-    Logger.info('Marked auth as settling (visibility change)', AUTH_CONTEXT);
+    // Non-blocking: just log and proceed
+    // Supabase handles token refresh automatically via autoRefreshToken: true
+    Logger.info('Tab became visible - Supabase will auto-refresh if needed', AUTH_CONTEXT);
 }
 
 async function waitForAuthReady() {
-    if (!authSettling) {
-        return true;
-    }
-    
-    Logger.info('Waiting for auth to settle...', AUTH_CONTEXT);
-    
-    const maxWait = 2000;
-    const checkInterval = 100;
-    let waited = 0;
-    
-    while (authSettling && waited < maxWait) {
-        await new Promise(resolve => setTimeout(resolve, checkInterval));
-        waited += checkInterval;
-    }
-    
-    if (authSettling) {
-        Logger.warn('Auth did not settle in time, forcing ready', AUTH_CONTEXT, { waitedMs: waited });
-        authSettling = false;
-    } else {
-        Logger.info(`Auth settled after ${waited}ms`, AUTH_CONTEXT);
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
+    // Non-blocking: don't wait, let queries proceed
+    // Handle auth errors reactively in the calling code
     return true;
 }
 

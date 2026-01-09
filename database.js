@@ -154,7 +154,8 @@ async function getConversation(conversationId) {
             .eq('id', conversationId)
             .single();
         
-        const result = await queryPromise;
+        // 30 second timeout - long enough for normal operation, catches truly hung connections
+        const result = await withTimeout(queryPromise, 30000, requestId, 'getConversation');
         const { data, error, status, statusText } = result;
         const elapsed = Date.now() - startTime;
         
@@ -319,7 +320,8 @@ async function loadMessagesFromSupabase(conversationId) {
             .eq('conversation_id', conversationId)
             .order('created_at', { ascending: true });
         
-        const result = await queryPromise;
+        // 30 second timeout - long enough for normal operation, catches truly hung connections
+        const result = await withTimeout(queryPromise, 30000, requestId, 'loadMessagesFromSupabase');
         const { data, error, status, statusText } = result;
         const elapsed = Date.now() - startTime;
         
