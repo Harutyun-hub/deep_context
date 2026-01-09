@@ -240,12 +240,47 @@ async function deleteConversation(conversationId) {
     }
 }
 
+function extractTextFromContent(content) {
+    if (!content) return '';
+    
+    if (typeof content === 'string') {
+        if (content.trim().startsWith('{')) {
+            try {
+                const parsed = JSON.parse(content);
+                if (parsed.text) return parsed.text;
+                if (parsed.answer) return parsed.answer;
+                if (parsed.message) return parsed.message;
+                return content;
+            } catch (e) {
+                return content;
+            }
+        }
+        return content;
+    }
+    
+    if (typeof content === 'object' && content !== null) {
+        if (content.text) return content.text;
+        if (content.answer) return content.answer;
+        if (content.message) return content.message;
+        return JSON.stringify(content);
+    }
+    
+    return String(content);
+}
+
+function normalizeRole(role) {
+    if (role === 'ai') return 'assistant';
+    return role;
+}
+
 async function saveMessageToSupabase(conversationId, userId, role, content) {
     const requestId = generateRequestId();
+    const normalizedRole = normalizeRole(role);
+    
     Logger.info(`Saving message`, DB_CONTEXT, { 
         requestId, 
         conversationId, 
-        role, 
+        role: normalizedRole, 
         contentLength: content?.length 
     });
     
@@ -257,13 +292,16 @@ async function saveMessageToSupabase(conversationId, userId, role, content) {
             contentToSave = JSON.stringify(content);
         }
         
+        const contentText = extractTextFromContent(content);
+        
         const { data, error } = await supabase
             .from('messages')
             .insert([{
                 conversation_id: conversationId,
                 user_id: userId,
-                role: role,
-                content: contentToSave
+                role: normalizedRole,
+                content: contentToSave,
+                content_text: contentText
             }])
             .select()
             .single();
@@ -348,8 +386,14 @@ async function loadMessagesFromSupabase(conversationId) {
                 }
             }
             
+            let role = msg.role;
+            if (role === 'assistant') {
+                role = 'ai';
+            }
+            
             return {
                 ...msg,
+                role: role,
                 content: content
             };
         });

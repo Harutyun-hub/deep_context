@@ -421,23 +421,48 @@ async function saveMessage(role, content, conversationId = null, userId = null) 
     
     if (!uId || !convId) {
         Logger.error(new Error('No user or conversation'), CHAT_CONTEXT);
-        return;
+        throw new Error('Missing user or conversation ID - cannot save message');
     }
+    
+    const startTime = Date.now();
+    Logger.info(`Starting save for ${role} message`, CHAT_CONTEXT, { 
+        conversationId: convId, 
+        contentLength: content?.length 
+    });
     
     try {
         const result = await withRetry(
             async () => {
                 const saveResult = await withTimeout(saveMessageToSupabase(convId, uId, role, content), SAVE_TIMEOUT_MS);
                 if (!saveResult.success) {
-                    throw new Error(saveResult.error?.message || 'Save failed');
+                    const errorMsg = saveResult.error?.message || 'Save failed';
+                    Logger.warn(`Save attempt failed: ${errorMsg}`, CHAT_CONTEXT, { role, conversationId: convId });
+                    throw new Error(errorMsg);
                 }
                 return saveResult;
             },
             MAX_RETRY_ATTEMPTS,
             RETRY_DELAY_MS
         );
+        
+        const elapsed = Date.now() - startTime;
+        Logger.info(`Message saved successfully`, CHAT_CONTEXT, { 
+            role, 
+            conversationId: convId, 
+            elapsedMs: elapsed 
+        });
+        
+        return result;
     } catch (error) {
-        Logger.error(error, CHAT_CONTEXT, { operation: 'saveMessage' });
+        const elapsed = Date.now() - startTime;
+        Logger.error(error, CHAT_CONTEXT, { 
+            operation: 'saveMessage', 
+            role, 
+            conversationId: convId,
+            elapsedMs: elapsed,
+            retryAttempts: MAX_RETRY_ATTEMPTS
+        });
+        throw error;
     }
 }
 
@@ -976,14 +1001,16 @@ async function handleSendMessage() {
     ChatStateMachine.setState(ChatState.SENDING, 'User sent message');
     
     try {
+        const userMessage = message;
+        const titleForConv = userMessage.length > 50 ? userMessage.substring(0, 50) + '...' : userMessage;
+        
         if (!currentConversationId) {
-            await createNewConversation();
+            await createNewConversation(titleForConv);
             if (!currentConversationId) {
                 throw new Error('Failed to create conversation');
             }
         }
         
-        const userMessage = message;
         input.value = '';
         
         const convIdAtSend = currentConversationId;
@@ -1020,24 +1047,20 @@ async function handleSendMessage() {
                 await aiMessageDiv.typingPromise;
             }
             
-            const titleForConv = userMessage.length > 50 ? userMessage.substring(0, 50) + '...' : userMessage;
-            
-            // Save AI message (don't block on this)
+            // Save AI message with guaranteed completion (not abandoned on timeout)
             const aiSavePromise = saveMessage('ai', aiResponse, convIdAtSend, userIdAtSend).catch(error => {
                 Logger.error(error, 'SendMessage', { operation: 'saveAIMessage' });
                 return null;
             });
             
-            // Wait for saves with timeout (don't let this block forever)
-            await Promise.race([
-                Promise.all([userSavePromise, aiSavePromise]),
-                new Promise(resolve => setTimeout(resolve, 10000)) // Max 10s wait for saves
-            ]);
-            
-            // Update title in background (non-blocking)
-            updateConversationTitleIfNeeded(convIdAtSend, titleForConv).catch(err => {
-                Logger.warn(`Title update failed: ${err.message}`, 'SendMessage');
-            });
+            // Wait for both saves to complete (with internal retry logic in saveMessage)
+            // No longer using Promise.race to avoid losing saves
+            try {
+                await Promise.all([userSavePromise, aiSavePromise]);
+                Logger.info('Both messages saved successfully', 'SendMessage');
+            } catch (saveError) {
+                Logger.error(saveError, 'SendMessage', { operation: 'saveBothMessages' });
+            }
             
         } catch (error) {
             typingMessage.remove();
@@ -1066,7 +1089,7 @@ async function handleSendMessage() {
     }
 }
 
-async function createNewConversation() {
+async function createNewConversation(initialTitle = null) {
     const user = getCurrentUser();
     if (!user) {
         Logger.error(new Error('No user logged in'), CHAT_CONTEXT);
@@ -1075,7 +1098,7 @@ async function createNewConversation() {
     
     try {
         currentSessionId = generateUUID();
-        const result = await createConversation(user.id, null, currentSessionId);
+        const result = await createConversation(user.id, initialTitle, currentSessionId);
         if (!result.success) {
             Logger.error(new Error(result.error?.message || 'Failed to create conversation'), CHAT_CONTEXT);
             return null;
