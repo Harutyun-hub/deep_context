@@ -124,10 +124,24 @@ async function waitForAuthReady() {
         return true;
     }
     
+    // Quick check: if we already have a valid session, skip waiting
+    if (currentUser && authSupabase) {
+        try {
+            const { data: { session } } = await authSupabase.auth.getSession();
+            if (session) {
+                Logger.info('Session already valid, skipping auth settle wait', AUTH_CONTEXT);
+                authSettling = false;
+                return true;
+            }
+        } catch (e) {
+            // Ignore errors, continue with normal wait
+        }
+    }
+    
     Logger.info('Waiting for auth to settle...', AUTH_CONTEXT);
     
-    const maxWait = 2000;
-    const checkInterval = 100;
+    const maxWait = 500; // Reduced from 2000ms to 500ms
+    const checkInterval = 50; // Check more frequently
     let waited = 0;
     
     while (authSettling && waited < maxWait) {
@@ -136,13 +150,11 @@ async function waitForAuthReady() {
     }
     
     if (authSettling) {
-        Logger.warn('Auth did not settle in time, forcing ready', AUTH_CONTEXT, { waitedMs: waited });
+        Logger.info('Auth settle timeout, proceeding anyway', AUTH_CONTEXT, { waitedMs: waited });
         authSettling = false;
     } else {
         Logger.info(`Auth settled after ${waited}ms`, AUTH_CONTEXT);
     }
-    
-    await new Promise(resolve => setTimeout(resolve, 200));
     
     return true;
 }

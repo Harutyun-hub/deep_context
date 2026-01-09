@@ -184,6 +184,30 @@ async function getConversation(conversationId) {
     }
 }
 
+async function getConversationTitle(conversationId) {
+    const requestId = generateRequestId();
+    
+    try {
+        const supabase = getSupabase();
+        
+        const { data, error } = await supabase
+            .from('conversations')
+            .select('title')
+            .eq('id', conversationId)
+            .single();
+        
+        if (error) {
+            return createErrorResult(error);
+        }
+        
+        return createSuccessResult(data?.title);
+        
+    } catch (err) {
+        Logger.error(err, DB_CONTEXT, { operation: 'getConversationTitle', requestId, conversationId });
+        return createErrorResult(err);
+    }
+}
+
 async function updateConversationTitle(conversationId, title) {
     const requestId = generateRequestId();
     Logger.info(`Updating conversation title`, DB_CONTEXT, { requestId, conversationId, title });

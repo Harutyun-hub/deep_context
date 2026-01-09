@@ -1056,8 +1056,23 @@ async function handleSendMessage() {
             // Wait for both saves to complete (with internal retry logic in saveMessage)
             // No longer using Promise.race to avoid losing saves
             try {
-                await Promise.all([userSavePromise, aiSavePromise]);
-                Logger.info('Both messages saved successfully', 'SendMessage');
+                const [userSaveResult, aiSaveResult] = await Promise.all([userSavePromise, aiSavePromise]);
+                
+                if (userSaveResult) {
+                    Logger.info('User message saved', 'SendMessage', { messageId: userSaveResult?.data?.id });
+                } else {
+                    Logger.error(new Error('User message save returned null'), 'SendMessage');
+                }
+                
+                if (aiSaveResult) {
+                    Logger.info('AI message saved', 'SendMessage', { messageId: aiSaveResult?.data?.id });
+                } else {
+                    Logger.error(new Error('AI message save returned null'), 'SendMessage');
+                }
+                
+                // Update conversation title if it's still null/empty (first message case)
+                await updateConversationTitleFromMessage(convIdAtSend, titleForConv);
+                
             } catch (saveError) {
                 Logger.error(saveError, 'SendMessage', { operation: 'saveBothMessages' });
             }
@@ -1127,6 +1142,52 @@ async function updateConversationTitleIfNeeded(conversationId, title) {
         }
     } catch (error) {
         Logger.warn(`Title update skipped: ${error.message}`, CHAT_CONTEXT);
+    }
+}
+
+const titledConversations = new Set();
+
+async function updateConversationTitleFromMessage(conversationId, title) {
+    // Skip if we've already titled this conversation in this session
+    if (titledConversations.has(conversationId)) {
+        return;
+    }
+    
+    try {
+        // Lightweight query - only fetches the title field
+        const result = await getConversationTitle(conversationId);
+        if (!result.success) {
+            Logger.warn('Could not fetch conversation title', CHAT_CONTEXT);
+            return;
+        }
+        
+        const currentTitle = result.data;
+        
+        // Only update if title is null, empty, or "New chat"
+        if (!currentTitle || currentTitle.trim() === '' || currentTitle === 'New chat') {
+            Logger.info(`Updating conversation title to: ${title}`, CHAT_CONTEXT, { conversationId });
+            
+            const updateResult = await updateConversationTitle(conversationId, title);
+            if (updateResult.success) {
+                // Mark as titled to avoid future redundant checks
+                titledConversations.add(conversationId);
+                
+                // Update sidebar immediately
+                const updated = updateSidebarTitleLocally(conversationId, title);
+                if (!updated) {
+                    // Reload sidebar if local update failed
+                    await loadConversationHistory();
+                }
+                Logger.info('Conversation title updated successfully', CHAT_CONTEXT);
+            } else {
+                Logger.warn('Failed to update conversation title', CHAT_CONTEXT, { error: updateResult.error });
+            }
+        } else {
+            // Title already exists, mark as titled
+            titledConversations.add(conversationId);
+        }
+    } catch (error) {
+        Logger.warn(`Title update from message skipped: ${error.message}`, CHAT_CONTEXT);
     }
 }
 
