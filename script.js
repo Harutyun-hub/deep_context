@@ -1386,7 +1386,10 @@ async function handleDeleteConversation(conversationId) {
         document.querySelectorAll('.chat-item-dropdown').forEach(d => d.classList.remove('show'));
         document.querySelectorAll('.chat-item-menu-btn').forEach(b => b.classList.remove('active'));
         
-        const result = await deleteConversation(conversationId);
+        const user = getCurrentUser();
+        const userId = user?.id || null;
+        
+        const result = await deleteConversation(conversationId, userId);
         if (!result.success) {
             throw new Error(result.error?.message || 'Failed to delete conversation');
         }

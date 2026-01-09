@@ -212,12 +212,22 @@ async function updateConversationTitle(conversationId, title) {
     }
 }
 
-async function deleteConversation(conversationId) {
+async function deleteConversation(conversationId, userId = null) {
     const requestId = generateRequestId();
-    Logger.info(`Deleting conversation: ${conversationId}`, DB_CONTEXT, { requestId });
+    Logger.info(`Deleting conversation: ${conversationId}`, DB_CONTEXT, { requestId, userId });
     
     try {
         const supabase = getSupabase();
+        
+        let ownerId = userId;
+        if (!ownerId) {
+            const { data: conv } = await supabase
+                .from('conversations')
+                .select('user_id')
+                .eq('id', conversationId)
+                .single();
+            ownerId = conv?.user_id || null;
+        }
         
         const { error } = await supabase
             .from('conversations')
@@ -229,9 +239,9 @@ async function deleteConversation(conversationId) {
             return createErrorResult(error);
         }
         
-        invalidateConversationCache(conversationId);
+        invalidateConversationCache(conversationId, ownerId);
         
-        Logger.info('Conversation deleted successfully', DB_CONTEXT, { requestId });
+        Logger.info('Conversation deleted successfully', DB_CONTEXT, { requestId, ownerId });
         return createSuccessResult(true);
         
     } catch (err) {
