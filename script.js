@@ -1125,30 +1125,51 @@ async function loadConversation(conversationId) {
     
     Logger.info(`START loading conversation: ${conversationId}`, 'LoadConv', { loadRequestId });
     
-    // Fast path: If currentUser exists, skip the auth wait (but still validate session)
+    // Check if user is authenticated - use cached user for fast path
     const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
     if (!user) {
-        // Only wait if there's an active auth operation (login/logout/initial load)
+        // No cached user - wait for auth to complete with timeout
+        console.log(`[DEBUG] No cached user, waiting for auth...`);
         if (typeof waitForAuthReady === 'function') {
-            await waitForAuthReady();
+            try {
+                await Promise.race([
+                    waitForAuthReady(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 2000))
+                ]);
+            } catch (e) {
+                console.error(`[ERROR] Auth wait failed: ${e.message}`);
+                Logger.error(new Error('Auth wait failed or timed out'), 'LoadConv', { loadRequestId });
+                isLoadingConversation = false;
+                return;
+            }
         }
     } else {
-        Logger.info('User already authenticated, skipping auth wait', 'LoadConv', { loadRequestId });
+        console.log(`[DEBUG] User authenticated (${user.email}), proceeding with bounded session check`);
     }
     
-    // Always verify session is valid before proceeding
-    console.log(`[DEBUG] Calling ensureValidSession...`);
+    // Bounded session validation - attempt but don't block forever (500ms timeout)
     if (typeof ensureValidSession === 'function') {
-        const session = await ensureValidSession();
-        console.log(`[DEBUG] ensureValidSession returned: ${session ? 'valid session' : 'null/invalid'}`);
-        if (!session) {
-            console.error(`[ERROR] No valid session, aborting load for ${conversationId}`);
-            Logger.error(new Error('No valid session, aborting load'), 'LoadConv', { loadRequestId });
-            isLoadingConversation = false;
-            return;
+        try {
+            const sessionResult = await Promise.race([
+                ensureValidSession(),
+                new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 500))
+            ]);
+            if (sessionResult === 'TIMEOUT') {
+                console.log(`[DEBUG] Session check timed out, proceeding with cached auth`);
+            } else if (!sessionResult) {
+                // Session explicitly returned null - redirect to login
+                console.error(`[ERROR] Session invalid, redirecting to login`);
+                if (typeof requireAuth === 'function') {
+                    requireAuth();
+                }
+                isLoadingConversation = false;
+                return;
+            } else {
+                console.log(`[DEBUG] Session validated successfully`);
+            }
+        } catch (e) {
+            console.log(`[DEBUG] Session check error: ${e.message}, proceeding anyway`);
         }
-    } else {
-        console.log(`[DEBUG] ensureValidSession function not available, skipping session check`);
     }
     
     const messagesContainer = document.getElementById('messages');
