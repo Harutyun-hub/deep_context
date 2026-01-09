@@ -31,6 +31,8 @@ let isInitialized = false;
 let isAppInitializing = false;
 let chatDropdownListenerAttached = false;
 let isLoadingConversation = false;
+let loadingStartTime = null;
+let activeLoadToken = null;
 let pendingBackgroundTasks = 0;
 let currentLoadId = 0;
 let appLifecycleReady = false;
@@ -257,6 +259,21 @@ function handleVisibilityChange() {
         if (typeof onVisibilityChange === 'function') {
             onVisibilityChange();
         }
+        
+        // Auto-retry stuck loads: if loading has been stuck for > 3 seconds, cancel and retry
+        if (isLoadingConversation && loadingStartTime && currentConversationId) {
+            const stuckDuration = Date.now() - loadingStartTime;
+            if (stuckDuration > 3000) {
+                Logger.info(`Stuck load detected (${Math.round(stuckDuration/1000)}s), auto-retrying...`, 'Visibility');
+                const conversationToRetry = currentConversationId;
+                cancelConversationLoad();
+                // Use .catch() to prevent unhandled rejection noise
+                loadConversation(conversationToRetry).catch(err => {
+                    Logger.warn(`Auto-retry failed: ${err.message}`, 'Visibility');
+                });
+            }
+        }
+        
         // Re-sync UI in case it got out of sync
         ChatStateMachine.syncUI();
     }
@@ -297,6 +314,8 @@ function cancelConversationLoad() {
         currentLoadAbortController = null;
     }
     isLoadingConversation = false;
+    loadingStartTime = null;
+    activeLoadToken = null;
 }
 
 // Cancel any ongoing AI request
@@ -1129,7 +1148,10 @@ async function loadConversation(conversationId) {
     currentLoadId++;
     const thisLoadId = currentLoadId;
     const loadRequestId = `load_${thisLoadId}_${Date.now()}`;
+    const thisLoadToken = Symbol('loadToken');
     isLoadingConversation = true;
+    loadingStartTime = Date.now();
+    activeLoadToken = thisLoadToken;
     
     Logger.info(`START loading conversation: ${conversationId}`, 'LoadConv', { loadRequestId });
     
@@ -1230,9 +1252,11 @@ async function loadConversation(conversationId) {
         }
     } finally {
         clearTimeout(loadTimeout);
-        // Only reset loading state if this is still the current load
-        if (thisLoadId === currentLoadId) {
+        // Only reset loading state if this is still the current load (token match prevents stale cleanup)
+        if (thisLoadId === currentLoadId && activeLoadToken === thisLoadToken) {
             isLoadingConversation = false;
+            loadingStartTime = null;
+            activeLoadToken = null;
             currentLoadAbortController = null;
         }
     }
