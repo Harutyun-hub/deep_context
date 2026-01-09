@@ -1,6 +1,5 @@
 let currentUser = null;
 let authSupabase = null;
-let authSettling = false;
 let authInitPromise = null;
 let authInitialized = false;
 
@@ -98,11 +97,6 @@ async function _performAuthInit() {
             if (!session && event !== 'SIGNED_OUT' && event !== 'INITIAL_SESSION') {
                 Logger.warn(`Session became null unexpectedly during event: ${event}`, AUTH_CONTEXT);
             }
-            
-            if (authSettling) {
-                Logger.info(`Auth state settled after event: ${event}`, AUTH_CONTEXT);
-                authSettling = false;
-            }
         });
         
         Logger.info('Auth initialization complete', AUTH_CONTEXT, { hasSession: !!session });
@@ -114,16 +108,13 @@ async function _performAuthInit() {
     }
 }
 
-function markAuthSettling() {
-    // Non-blocking: just log and proceed
-    // Supabase handles token refresh automatically via autoRefreshToken: true
-    Logger.info('Tab became visible - Supabase will auto-refresh if needed', AUTH_CONTEXT);
-}
-
-async function waitForAuthReady() {
-    // Non-blocking: don't wait, let queries proceed
-    // Handle auth errors reactively in the calling code
-    return true;
+function onVisibilityChange() {
+    // Fire-and-forget session refresh - NO await, NO blocking
+    // This wakes up Supabase to refresh tokens in the background
+    if (authSupabase) {
+        authSupabase.auth.getSession().catch(() => {});
+        Logger.info('Tab visible - triggered background session refresh', AUTH_CONTEXT);
+    }
 }
 
 async function ensureValidSession() {
@@ -302,8 +293,7 @@ const Auth = {
     signOut: signOut,
     getCurrentUser: getCurrentUser,
     isInitialized: isAuthInitialized,
-    waitForReady: waitForAuthReady,
-    markSettling: markAuthSettling,
+    onVisibilityChange: onVisibilityChange,
     ensureValidSession: ensureValidSession,
     requireAuth: requireAuth
 };

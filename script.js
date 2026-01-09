@@ -253,9 +253,9 @@ const debouncedLoadConversation = debounce((conversationId) => {
 function handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
         Logger.info(`Tab visible, current state: ${ChatStateMachine.getState()}`, 'Visibility');
-        // Mark auth as potentially settling - Supabase may refresh token
-        if (typeof markAuthSettling === 'function') {
-            markAuthSettling();
+        // Fire-and-forget session refresh - NO blocking
+        if (typeof onVisibilityChange === 'function') {
+            onVisibilityChange();
         }
         // Re-sync UI in case it got out of sync
         ChatStateMachine.syncUI();
@@ -1133,13 +1133,19 @@ async function loadConversation(conversationId) {
     
     Logger.info(`START loading conversation: ${conversationId}`, 'LoadConv', { loadRequestId });
     
-    // Wait for auth to settle if needed (after visibility change)
-    if (typeof waitForAuthReady === 'function') {
-        await waitForAuthReady();
-    }
+    // OPTIMISTIC: Update UI immediately - no waiting
+    const previousConversationId = currentConversationId;
+    currentConversationId = conversationId;
+    
+    // Highlight the selected conversation in sidebar immediately
+    document.querySelectorAll('.chat-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.conversationId === conversationId) {
+            item.classList.add('active');
+        }
+    });
     
     const messagesContainer = document.getElementById('messages');
-    const previousConversationId = currentConversationId;
     
     // Add timeout for loading to prevent infinite loading state
     // Only trigger if this is still the active load
@@ -1176,8 +1182,6 @@ async function loadConversation(conversationId) {
         }
         
         const loadedSessionId = conversation.session_id || generateUUID();
-        
-        currentConversationId = conversationId;
         currentSessionId = loadedSessionId;
         
         messagesContainer.innerHTML = '';
@@ -1415,6 +1419,11 @@ async function handleDeleteConversation(conversationId) {
             throw new Error(result.error?.message || 'Failed to delete conversation');
         }
         
+        // OPTIMISTIC: Remove DOM element immediately - no waiting for list refresh
+        if (chatItem) {
+            chatItem.remove();
+        }
+        
         if (wasCurrentConversation) {
             currentConversationId = null;
             currentSessionId = null;
@@ -1422,11 +1431,11 @@ async function handleDeleteConversation(conversationId) {
             showWelcomeMessage();
         }
         
+        // Invalidate cache in background - don't block UI
         if (typeof QueryCache !== 'undefined') {
             QueryCache.invalidate('user_conversations');
         }
         
-        await loadConversationHistory();
         showToast('Conversation deleted successfully', 'success');
     } catch (error) {
         Logger.error(error, CHAT_CONTEXT, { operation: 'handleDeleteConversation' });
