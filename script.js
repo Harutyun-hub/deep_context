@@ -55,11 +55,17 @@ function isAuthError(error) {
 
 // Lifecycle management for cleanup
 let currentTypingInterval = null;
+let currentTypingAnimationId = null;
+let currentTypingResolve = null;
 let currentLoadAbortController = null;
 let currentAIAbortController = null;
 const AI_FETCH_TIMEOUT_MS = 300000;
 const INPUT_UNLOCK_TIMEOUT_MS = 330000;
 const TYPING_EFFECT_TIMEOUT_MS = 15000;
+
+// Visibility tracking for delta-time animation
+let lastVisibilityHideTime = null;
+const VISIBILITY_SKIP_THRESHOLD_MS = 2000;
 
 const SAVE_TIMEOUT_MS = 60000;
 const MAX_RETRY_ATTEMPTS = 3;
@@ -253,8 +259,19 @@ const debouncedLoadConversation = debounce((conversationId) => {
 
 // Named handler for visibility change - enables proper removal
 function handleVisibilityChange() {
-    if (document.visibilityState === 'visible') {
-        Logger.info(`Tab visible, current state: ${ChatStateMachine.getState()}`, 'Visibility');
+    if (document.visibilityState === 'hidden') {
+        // Track when tab was hidden for delta-time calculations
+        lastVisibilityHideTime = Date.now();
+        Logger.info('Tab hidden, timestamp recorded', 'Visibility');
+    } else if (document.visibilityState === 'visible') {
+        const hiddenDuration = lastVisibilityHideTime ? Date.now() - lastVisibilityHideTime : 0;
+        Logger.info(`Tab visible after ${Math.round(hiddenDuration/1000)}s, current state: ${ChatStateMachine.getState()}`, 'Visibility');
+        
+        // Note: If tab was hidden for >2 seconds while typing was in progress,
+        // the requestAnimationFrame loop's delta-time detection will automatically
+        // detect the large gap and complete the animation immediately (showing all remaining content).
+        // This is handled in showTypingEffect's animateFrame function.
+        
         // Fire-and-forget session refresh - NO blocking
         if (typeof onVisibilityChange === 'function') {
             onVisibilityChange();
@@ -273,6 +290,9 @@ function handleVisibilityChange() {
                 });
             }
         }
+        
+        // Reset hidden time tracker
+        lastVisibilityHideTime = null;
         
         // Re-sync UI in case it got out of sync
         ChatStateMachine.syncUI();
@@ -297,14 +317,27 @@ function cleanupChatDropdowns() {
     }
 }
 
-// Cleanup typing effect interval
+// Cleanup typing effect interval and animation frame
 function cleanupTypingEffect() {
     if (currentTypingInterval) {
         clearInterval(currentTypingInterval);
         currentTypingInterval = null;
     }
+    if (currentTypingAnimationId) {
+        cancelAnimationFrame(currentTypingAnimationId);
+        currentTypingAnimationId = null;
+    }
+    currentTypingResolve = null;
     // Remove any lingering typing cursors
     document.querySelectorAll('.typing-cursor').forEach(cursor => cursor.remove());
+}
+
+// Force-complete typing effect immediately (used when returning from background tab)
+function forceCompleteTypingEffect() {
+    if (currentTypingResolve) {
+        Logger.info('Force-completing typing effect due to tab visibility change', 'TypingEffect');
+        currentTypingResolve();
+    }
 }
 
 // Cancel any ongoing conversation load
@@ -747,10 +780,17 @@ function showTypingEffect(content, contentDiv) {
                 clearTimeout(typingTimeout);
                 typingTimeout = null;
             }
+            // Clear global resolve reference
+            if (currentTypingResolve === safeResolve) {
+                currentTypingResolve = null;
+            }
             cleanupTypingEffect();
             Logger.info('Resolved', 'TypingEffect');
             resolve();
         };
+        
+        // Store resolve function globally so visibility change can call it
+        currentTypingResolve = safeResolve;
         
         // GUARANTEED RESOLUTION: Max 15 seconds for typing effect
         typingTimeout = setTimeout(() => {
@@ -767,6 +807,8 @@ function showTypingEffect(content, contentDiv) {
         
         // Cleanup any existing typing effect first
         cleanupTypingEffect();
+        // Re-store after cleanup since cleanup clears it
+        currentTypingResolve = safeResolve;
         
         try {
             const renderedContent = renderMessage(content);
@@ -816,43 +858,85 @@ function showTypingEffect(content, contentDiv) {
             let globalWordIndex = 0;
             const totalWords = elementsToAnimate.reduce((sum, item) => sum + item.words.length, 0);
             
-            // Store interval globally for cleanup
-            currentTypingInterval = setInterval(() => {
+            // Delta-time based animation using requestAnimationFrame
+            const WORD_INTERVAL_MS = 60;
+            let lastFrameTime = performance.now();
+            let accumulatedTime = 0;
+            
+            function animateFrame(currentTime) {
                 if (resolved) {
-                    clearInterval(currentTypingInterval);
-                    currentTypingInterval = null;
+                    currentTypingAnimationId = null;
                     return;
                 }
                 
-                try {
-                    for (let item of elementsToAnimate) {
+                // Calculate delta time since last frame
+                const deltaTime = currentTime - lastFrameTime;
+                lastFrameTime = currentTime;
+                
+                // If tab was hidden and we're resuming, check if we should skip
+                // Large deltaTime (>500ms) indicates we were in background
+                if (deltaTime > 500) {
+                    Logger.info(`Large delta detected (${Math.round(deltaTime)}ms), completing animation`, 'TypingEffect');
+                    // Show all remaining content immediately
+                    elementsToAnimate.forEach(item => {
                         if (item.currentIndex < item.words.length) {
-                            const word = item.words[item.currentIndex];
-                            item.node.textContent += (item.currentIndex === 0 ? '' : ' ') + word;
-                            item.currentIndex++;
-                            globalWordIndex++;
-                            break;
+                            const remainingWords = item.words.slice(item.currentIndex).join(' ');
+                            item.node.textContent += (item.currentIndex === 0 ? '' : ' ') + remainingWords;
+                            item.currentIndex = item.words.length;
                         }
-                    }
-                    
-                    const chatContainer = document.getElementById('chatContainer');
-                    if (chatContainer) {
-                        const isNearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 100;
-                        if (isNearBottom) {
-                            chatContainer.scrollTop = chatContainer.scrollHeight;
-                        }
-                    }
-                    
-                    if (globalWordIndex >= totalWords) {
-                        cursor.remove();
-                        safeResolve();
-                    }
-                } catch (err) {
-                    Logger.error(err, 'TypingEffect', { operation: 'animation' });
+                    });
                     cursor.remove();
                     safeResolve();
+                    return;
                 }
-            }, 60);
+                
+                accumulatedTime += deltaTime;
+                
+                // Process words based on accumulated time
+                while (accumulatedTime >= WORD_INTERVAL_MS && globalWordIndex < totalWords) {
+                    accumulatedTime -= WORD_INTERVAL_MS;
+                    
+                    try {
+                        for (let item of elementsToAnimate) {
+                            if (item.currentIndex < item.words.length) {
+                                const word = item.words[item.currentIndex];
+                                item.node.textContent += (item.currentIndex === 0 ? '' : ' ') + word;
+                                item.currentIndex++;
+                                globalWordIndex++;
+                                break;
+                            }
+                        }
+                    } catch (err) {
+                        Logger.error(err, 'TypingEffect', { operation: 'animation' });
+                        cursor.remove();
+                        safeResolve();
+                        return;
+                    }
+                }
+                
+                // Auto-scroll if near bottom
+                const chatContainer = document.getElementById('chatContainer');
+                if (chatContainer) {
+                    const isNearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 100;
+                    if (isNearBottom) {
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                }
+                
+                // Check if animation is complete
+                if (globalWordIndex >= totalWords) {
+                    cursor.remove();
+                    safeResolve();
+                    return;
+                }
+                
+                // Schedule next frame
+                currentTypingAnimationId = requestAnimationFrame(animateFrame);
+            }
+            
+            // Start the animation loop
+            currentTypingAnimationId = requestAnimationFrame(animateFrame);
+            
         } catch (err) {
             Logger.error(err, 'TypingEffect', { operation: 'render' });
             // Fallback: just show the content without animation
@@ -1035,11 +1119,10 @@ async function handleSendMessage() {
         
         addMessageToUI('user', userMessage);
         
-        // Save user message (don't await, let it run in background with timeout)
-        const userSavePromise = saveMessage('user', userMessage, convIdAtSend, userIdAtSend).catch(error => {
+        // Save user message via PendingMessageQueue (handles retries and persistence)
+        // No await needed - queue handles background sync with localStorage backup
+        saveMessage('user', userMessage, convIdAtSend, userIdAtSend).catch(error => {
             Logger.error(error, 'SendMessage', { operation: 'saveUserMessage' });
-            showToast('Failed to save message', 'error');
-            return null;
         });
         
         const typingMessage = addMessageToUI('ai', '', true);
@@ -1066,17 +1149,11 @@ async function handleSendMessage() {
             
             const titleForConv = userMessage.length > 50 ? userMessage.substring(0, 50) + '...' : userMessage;
             
-            // Save AI message (don't block on this)
-            const aiSavePromise = saveMessage('ai', aiResponse, convIdAtSend, userIdAtSend).catch(error => {
+            // Save AI message via PendingMessageQueue (handles retries and persistence)
+            // No await needed - queue handles background sync with localStorage backup
+            saveMessage('ai', aiResponse, convIdAtSend, userIdAtSend).catch(error => {
                 Logger.error(error, 'SendMessage', { operation: 'saveAIMessage' });
-                return null;
             });
-            
-            // Wait for saves with timeout (don't let this block forever)
-            await Promise.race([
-                Promise.all([userSavePromise, aiSavePromise]),
-                new Promise(resolve => setTimeout(resolve, 10000)) // Max 10s wait for saves
-            ]);
             
             // Update title in background (non-blocking)
             updateConversationTitleIfNeeded(convIdAtSend, titleForConv).catch(err => {
