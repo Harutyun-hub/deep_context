@@ -117,6 +117,118 @@ function onVisibilityChange() {
     }
 }
 
+/**
+ * Ensures the connection is ready before heavy database operations.
+ * This "warms up" the connection by:
+ * 1. Awaiting session refresh (not fire-and-forget)
+ * 2. Running a lightweight ping query to wake up the network path
+ * 
+ * @param {number} timeoutMs - Maximum time to wait (default 3000ms)
+ * @returns {Promise<{ready: boolean, session: object|null, error: string|null}>}
+ */
+async function ensureConnectionReady(timeoutMs = 3000) {
+    const startTime = Date.now();
+    Logger.info('Connection warm-up starting...', AUTH_CONTEXT);
+    
+    if (!authSupabase) {
+        Logger.warn('ensureConnectionReady: No Supabase client available', AUTH_CONTEXT);
+        return { ready: false, session: null, error: 'No Supabase client' };
+    }
+    
+    // Use explicit timeout control with clearTimeout to avoid race conditions
+    let timeoutId = null;
+    let timedOut = false;
+    
+    try {
+        // Create a promise that rejects on timeout
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                timedOut = true;
+                reject(new Error('Connection warm-up timeout'));
+            }, timeoutMs);
+        });
+        
+        // The actual warm-up work
+        const warmupPromise = (async () => {
+            // Step 1: Await session refresh (this is the key fix - NOT fire-and-forget)
+            Logger.info('Warm-up Step 1: Refreshing session...', AUTH_CONTEXT);
+            const sessionStart = Date.now();
+            
+            const { data: { session }, error: sessionError } = await authSupabase.auth.getSession();
+            
+            // Check if we timed out while waiting
+            if (timedOut) return null;
+            
+            const sessionDuration = Date.now() - sessionStart;
+            Logger.info(`Warm-up Step 1 complete: Session refresh took ${sessionDuration}ms`, AUTH_CONTEXT);
+            
+            if (sessionError) {
+                Logger.error(sessionError, AUTH_CONTEXT, { operation: 'warmup-session' });
+                return { ready: false, session: null, error: sessionError.message };
+            }
+            
+            if (!session) {
+                Logger.warn('Warm-up: No active session found', AUTH_CONTEXT);
+                return { ready: false, session: null, error: 'No active session' };
+            }
+            
+            // Step 2: Lightweight ping query to wake up the network path
+            Logger.info('Warm-up Step 2: Pinging database...', AUTH_CONTEXT);
+            const pingStart = Date.now();
+            
+            const { data: pingData, error: pingError } = await authSupabase
+                .from('users')
+                .select('id')
+                .eq('id', session.user.id)
+                .single();
+            
+            // Check if we timed out while waiting
+            if (timedOut) return null;
+            
+            const pingDuration = Date.now() - pingStart;
+            Logger.info(`Warm-up Step 2 complete: Ping took ${pingDuration}ms`, AUTH_CONTEXT);
+            
+            if (pingError && pingError.code !== 'PGRST116') {
+                // PGRST116 is "not found" which is fine for a ping
+                Logger.warn('Warm-up ping warning (non-fatal)', AUTH_CONTEXT, { error: pingError.message });
+            }
+            
+            const totalDuration = Date.now() - startTime;
+            Logger.info(`Connection warm-up SUCCESS in ${totalDuration}ms`, AUTH_CONTEXT);
+            
+            return { ready: true, session, error: null };
+        })();
+        
+        // Race between the warm-up and timeout
+        const result = await Promise.race([warmupPromise, timeoutPromise]);
+        
+        // CRITICAL: Clear the timeout to prevent lingering timer
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+        
+        return result || { ready: false, session: null, error: 'Warm-up cancelled' };
+        
+    } catch (error) {
+        // Clear timeout on error too
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+        
+        const duration = Date.now() - startTime;
+        
+        if (error.message === 'Connection warm-up timeout') {
+            Logger.warn(`Connection warm-up TIMEOUT after ${duration}ms`, AUTH_CONTEXT);
+            return { ready: false, session: null, error: 'Timeout - connection may be stale' };
+        }
+        
+        Logger.error(error, AUTH_CONTEXT, { operation: 'ensureConnectionReady', duration });
+        return { ready: false, session: null, error: error.message };
+    }
+}
+
 async function ensureValidSession() {
     if (!authSupabase) {
         Logger.warn('ensureValidSession: No Supabase client', AUTH_CONTEXT);
@@ -295,5 +407,6 @@ const Auth = {
     isInitialized: isAuthInitialized,
     onVisibilityChange: onVisibilityChange,
     ensureValidSession: ensureValidSession,
+    ensureConnectionReady: ensureConnectionReady,
     requireAuth: requireAuth
 };

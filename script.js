@@ -272,16 +272,76 @@ function handleVisibilityChange() {
         // detect the large gap and complete the animation immediately (showing all remaining content).
         // This is handled in showTypingEffect's animateFrame function.
         
-        // Fire-and-forget session refresh - NO blocking
-        if (typeof onVisibilityChange === 'function') {
-            onVisibilityChange();
+        // Handle visibility change with connection warm-up (async, non-blocking to main thread)
+        handleVisibilityResume(hiddenDuration);
+        
+        // Reset hidden time tracker
+        lastVisibilityHideTime = null;
+        
+        // Re-sync UI in case it got out of sync
+        ChatStateMachine.syncUI();
+    }
+}
+
+// Track if a warm-up is currently in progress to prevent concurrent warm-ups
+let warmupInProgress = false;
+let pendingWarmupRequest = null;
+
+// Async handler for tab resume - warms up connection before retrying loads
+async function handleVisibilityResume(hiddenDuration) {
+    // Debounce: If a warm-up is already in progress, queue this request
+    if (warmupInProgress) {
+        Logger.info('Warm-up already in progress, queuing request...', 'Visibility');
+        pendingWarmupRequest = hiddenDuration;
+        return;
+    }
+    
+    warmupInProgress = true;
+    
+    try {
+        // If tab was hidden for more than 2 seconds, do a proper warm-up
+        if (hiddenDuration > 2000) {
+            Logger.info(`Tab was hidden for ${Math.round(hiddenDuration/1000)}s, warming up connection...`, 'Visibility');
+            
+            // Use Auth.ensureConnectionReady if available, otherwise fallback to fire-and-forget
+            if (typeof Auth !== 'undefined' && Auth.ensureConnectionReady) {
+                const warmupResult = await Auth.ensureConnectionReady(3000);
+                
+                if (!warmupResult.ready) {
+                    Logger.warn(`Connection warm-up failed: ${warmupResult.error}`, 'Visibility');
+                    // Show a subtle reconnecting indicator (don't block UI)
+                    showReconnectingIndicator();
+                    
+                    // Try one more time with a longer timeout
+                    const retryResult = await Auth.ensureConnectionReady(5000);
+                    hideReconnectingIndicator();
+                    
+                    if (!retryResult.ready) {
+                        Logger.error(new Error(`Connection warm-up failed after retry: ${retryResult.error}`), 'Visibility');
+                        // Don't retry loads - let user manually click
+                        return;
+                    }
+                }
+                
+                Logger.info('Connection warm-up successful, checking for stuck loads...', 'Visibility');
+            } else {
+                // Fallback to old fire-and-forget behavior
+                if (typeof onVisibilityChange === 'function') {
+                    onVisibilityChange();
+                }
+            }
+        } else {
+            // Short hide, just do fire-and-forget refresh
+            if (typeof onVisibilityChange === 'function') {
+                onVisibilityChange();
+            }
         }
         
         // Auto-retry stuck loads: if loading has been stuck for > 3 seconds, cancel and retry
         if (isLoadingConversation && loadingStartTime && currentConversationId) {
             const stuckDuration = Date.now() - loadingStartTime;
             if (stuckDuration > 3000) {
-                Logger.info(`Stuck load detected (${Math.round(stuckDuration/1000)}s), auto-retrying...`, 'Visibility');
+                Logger.info(`Stuck load detected (${Math.round(stuckDuration/1000)}s), auto-retrying after warm-up...`, 'Visibility');
                 const conversationToRetry = currentConversationId;
                 cancelConversationLoad();
                 // Use .catch() to prevent unhandled rejection noise
@@ -290,12 +350,49 @@ function handleVisibilityChange() {
                 });
             }
         }
+    } finally {
+        warmupInProgress = false;
         
-        // Reset hidden time tracker
-        lastVisibilityHideTime = null;
-        
-        // Re-sync UI in case it got out of sync
-        ChatStateMachine.syncUI();
+        // Process any queued warm-up request
+        if (pendingWarmupRequest !== null) {
+            const queuedDuration = pendingWarmupRequest;
+            pendingWarmupRequest = null;
+            Logger.info('Processing queued warm-up request...', 'Visibility');
+            // Use setTimeout to avoid deep recursion
+            setTimeout(() => handleVisibilityResume(queuedDuration), 0);
+        }
+    }
+}
+
+// Show a subtle reconnecting indicator
+function showReconnectingIndicator() {
+    // Remove any existing indicator
+    hideReconnectingIndicator();
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'reconnecting-indicator';
+    indicator.innerHTML = 'Reconnecting...';
+    indicator.style.cssText = `
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        z-index: 10000;
+        backdrop-filter: blur(10px);
+    `;
+    document.body.appendChild(indicator);
+}
+
+// Hide the reconnecting indicator
+function hideReconnectingIndicator() {
+    const existing = document.getElementById('reconnecting-indicator');
+    if (existing) {
+        existing.remove();
     }
 }
 

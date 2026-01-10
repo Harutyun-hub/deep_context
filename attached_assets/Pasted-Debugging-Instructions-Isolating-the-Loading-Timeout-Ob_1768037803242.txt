@@ -1,0 +1,61 @@
+Debugging Instructions: Isolating the Loading Timeout
+Objective: Determine if the 30-second "Loading..." hang on tab resume is caused by a Stalled Token Refresh (Auth System) or a Network/Database Connection Hang (Infrastructure).
+
+Please instruct the Replit AI to perform the following investigation:
+
+1. Instrument the Auth Visibility Handler
+Ask the AI to modify the 
+
+onVisibilityChange
+ function in 
+
+auth.js
+.
+
+Goal: verification of the background session refresh.
+Instruction: Add specific logging before and after the 
+
+auth.js
+ session refresh call.
+Log a "Starting Refresh" message when the tab becomes visible.
+Log a "Refresh Success" message (including the elapsed time in ms) when the promise resolves.
+Log a "Refresh Failed" message if it rejects.
+Why: This will tell us if the browser is even allowing the authentication network request to complete.
+2. Instrument the Conversation Loader
+Ask the AI to modify the 
+
+loadConversation
+ function in 
+
+script.js
+.
+
+Goal: verification of the database query execution.
+Instruction: Add logging specifically around the 
+
+getConversation
+ database call.
+Log "Starting DB Query" immediately before the await getConversation() line.
+Log "DB Query Finished" immediately after that line.
+Why: If we see "Starting DB Query" but never "DB Query Finished", we know the connection is hanging after authentication has supposedly cleared.
+3. The Test Procedure
+Instruct the AI to run the application and perform this specific test:
+
+Open the Chat.
+Open the Browser Console.
+Switch Tabs (leave the chat tab in the background) for 20 seconds.
+Switch Back to the chat.
+Check the logs immediately.
+4. How to Interpret the Results
+Tell the AI to analyze the logs based on these two scenarios:
+
+Scenario A: Auth Failure (Token Freeze)
+
+Result: You see "Starting Refresh" but never see "Refresh Success", or it takes >10 seconds.
+Conclusion: The Auth system is getting throttled.
+Fix: Implement a "Force Re-Auth" command that cancels the pending request and starts a fresh one immediately on visibility change.
+Scenario B: Connection Failure (Dead Socket)
+
+Result: You see "Refresh Success" quickly, but then "Starting DB Query" hangs and times out.
+Conclusion: The Auth token is fine, but the underlying network socket was closed by the browser/server while in the background.
+Fix: Implement a "Connection Warm-up" (a lightweight ping query) to wake up the connection before attempting to load the heavy full conversation.
