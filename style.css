@@ -2005,12 +2005,12 @@ button:disabled {
     background: var(--glass-bg-strong);
 }
 
-/* Mobile overlay for sidebar */
+/* Mobile overlay for sidebar - light overlay to preserve glass effect */
 .mobile-overlay {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(255, 255, 255, 0.3);
     z-index: 99;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -2039,11 +2039,13 @@ button:disabled {
         z-index: 100;
         transform: translateX(-100%);
         width: 280px;
-        /* Restore glassmorphism on mobile */
+        /* Use same glass styling as desktop */
+        background: var(--glass-bg);
         backdrop-filter: blur(24px);
         -webkit-backdrop-filter: blur(24px);
-        background: var(--glass-bg);
         border-right: 1px solid var(--glass-border);
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+        padding-top: env(safe-area-inset-top, 0px);
     }
 
     .sidebar.open {
@@ -2102,7 +2104,8 @@ button:disabled {
     }
     
     .sidebar-actions {
-        padding: 12px 16px;
+        padding: 16px;
+        margin-top: 4px;
         border-bottom: 1px solid var(--glass-border);
     }
     

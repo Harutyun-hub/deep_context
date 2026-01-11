@@ -436,11 +436,13 @@ body.dashboard-page .sidebar-footer {
         z-index: 100;
         transform: translateX(-100%);
         width: 280px;
-        /* Restore glassmorphism on mobile */
+        /* Use same glass styling as desktop */
+        background: var(--glass-bg);
         backdrop-filter: blur(24px);
         -webkit-backdrop-filter: blur(24px);
-        background: var(--glass-bg);
         border-right: 1px solid var(--glass-border);
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+        padding-top: env(safe-area-inset-top, 0px);
     }
     
     body.dashboard-page .sidebar.open {
