@@ -577,6 +577,12 @@
             mobileMenuToggle.addEventListener('click', toggleMobileMenu);
         }
         
+        // Also wire up the menu button inside sidebar to close menu
+        const menuBtn = document.getElementById('menuBtn');
+        if (menuBtn) {
+            menuBtn.addEventListener('click', closeMobileMenu);
+        }
+        
         if (mobileOverlay) {
             mobileOverlay.addEventListener('click', closeMobileMenu);
         }

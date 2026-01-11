@@ -442,7 +442,8 @@ body.dashboard-page .sidebar-footer {
         -webkit-backdrop-filter: blur(24px);
         border-right: 1px solid var(--glass-border);
         box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
-        padding-top: env(safe-area-inset-top, 0px);
+        /* Extra top padding to ensure content doesn't get clipped */
+        padding-top: max(16px, env(safe-area-inset-top, 16px));
     }
     
     body.dashboard-page .sidebar.open {
