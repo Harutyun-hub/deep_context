@@ -1341,8 +1341,53 @@ async function loadConversation(conversationId) {
     
     Logger.info(`START loading conversation: ${conversationId}`, 'LoadConv', { loadRequestId });
     
-    // OPTIMISTIC: Update UI immediately - no waiting
+    const messagesContainer = document.getElementById('messages');
     const previousConversationId = currentConversationId;
+    
+    // CONNECTIVITY GATEKEEPER: Verify connection is alive before database queries
+    // This prevents 30-second hangs when returning from sleep/tab restore
+    if (typeof ensureConnectionReady === 'function') {
+        Logger.info('Running connection pre-flight check...', 'LoadConv', { loadRequestId });
+        const connectionStatus = await ensureConnectionReady(3000);
+        
+        // Check if this load was cancelled while waiting for pre-flight
+        if (thisLoadId !== currentLoadId || currentLoadAbortController?.signal.aborted) {
+            Logger.info('Load cancelled during pre-flight check', 'LoadConv', { loadRequestId });
+            isLoadingConversation = false;
+            return;
+        }
+        
+        if (!connectionStatus.ready) {
+            Logger.warn(`Connection not ready: ${connectionStatus.error}`, 'LoadConv', { loadRequestId });
+            
+            // Show subtle syncing indicator instead of error
+            messagesContainer.innerHTML = `
+                <div class="syncing-indicator">
+                    <div class="syncing-spinner"></div>
+                    <span>Syncing...</span>
+                </div>`;
+            
+            // Trigger background session refresh to wake up the connection
+            if (typeof authSupabase !== 'undefined' && authSupabase) {
+                authSupabase.auth.getSession().catch(() => {});
+            }
+            
+            // Schedule auto-retry after 2 seconds
+            setTimeout(() => {
+                if (thisLoadId === currentLoadId) {
+                    Logger.info('Auto-retrying conversation load after sync...', 'LoadConv', { loadRequestId });
+                    loadConversation(conversationId).catch(() => {});
+                }
+            }, 2000);
+            
+            isLoadingConversation = false;
+            return;
+        }
+        
+        Logger.info('Connection pre-flight passed', 'LoadConv', { loadRequestId });
+    }
+    
+    // OPTIMISTIC: Update UI immediately - no waiting
     currentConversationId = conversationId;
     
     // Highlight the selected conversation in sidebar immediately
@@ -1352,8 +1397,6 @@ async function loadConversation(conversationId) {
             item.classList.add('active');
         }
     });
-    
-    const messagesContainer = document.getElementById('messages');
     
     // Add timeout for loading to prevent infinite loading state
     // Only trigger if this is still the active load

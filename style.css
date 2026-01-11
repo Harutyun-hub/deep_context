@@ -1479,6 +1479,29 @@ body {
     }
 }
 
+.syncing-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.syncing-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #e5e7eb;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: syncSpin 0.8s linear infinite;
+}
+
+@keyframes syncSpin {
+    to { transform: rotate(360deg); }
+}
+
 .error-message {
     background: #fef2f2;
     border: 1px solid #fecaca;
