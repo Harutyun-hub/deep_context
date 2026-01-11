@@ -627,6 +627,61 @@ async function saveMessage(role, content, conversationId = null, userId = null) 
     }
 }
 
+/**
+ * Save message directly to Supabase with confirmation.
+ * Uses shorter timeout for better UX, falls back to queue on failure.
+ * Returns { success: boolean, data?: object, error?: string }
+ */
+async function saveMessageDirect(role, content, conversationId = null, userId = null) {
+    const user = getCurrentUser();
+    const convId = conversationId || currentConversationId;
+    const uId = userId || (user ? user.id : null);
+    
+    if (!uId || !convId) {
+        Logger.error(new Error('No user or conversation'), CHAT_CONTEXT);
+        return { success: false, error: 'No user or conversation' };
+    }
+    
+    const clientMessageId = generateUUID();
+    const DIRECT_SAVE_TIMEOUT_MS = 15000; // 15s for direct saves (shorter for UX)
+    
+    try {
+        const saveResult = await withTimeout(
+            saveMessageToSupabase(convId, uId, role, content, clientMessageId), 
+            DIRECT_SAVE_TIMEOUT_MS
+        );
+        
+        if (!saveResult.success) {
+            Logger.error(new Error(saveResult.error?.message || 'Save failed'), CHAT_CONTEXT, { 
+                operation: 'saveMessageDirect',
+                role,
+                conversationId: convId
+            });
+            return { success: false, error: saveResult.error?.message || 'Save failed' };
+        }
+        
+        Logger.info(`Message saved directly: ${saveResult.data?.id}`, CHAT_CONTEXT, { role, conversationId: convId });
+        return { success: true, data: saveResult.data };
+        
+    } catch (error) {
+        Logger.error(error, CHAT_CONTEXT, { operation: 'saveMessageDirect', role });
+        
+        // Fallback to queue for retry
+        if (typeof PendingMessageQueue !== 'undefined') {
+            PendingMessageQueue.enqueue({
+                clientMessageId,
+                conversationId: convId,
+                userId: uId,
+                role,
+                content
+            });
+            Logger.info('Message queued for retry after direct save failure', CHAT_CONTEXT);
+        }
+        
+        return { success: false, error: error.message };
+    }
+}
+
 async function loadMessages() {
     if (!currentConversationId) {
         return [];
@@ -1228,11 +1283,8 @@ async function handleSendMessage() {
         
         addMessageToUI('user', userMessage);
         
-        // Save user message via PendingMessageQueue (handles retries and persistence)
-        // No await needed - queue handles background sync with localStorage backup
-        saveMessage('user', userMessage, convIdAtSend, userIdAtSend).catch(error => {
-            Logger.error(error, 'SendMessage', { operation: 'saveUserMessage' });
-        });
+        // Save user message - use short timeout for responsiveness, queue handles retries
+        const userSavePromise = saveMessageDirect('user', userMessage, convIdAtSend, userIdAtSend);
         
         const typingMessage = addMessageToUI('ai', '', true);
         
@@ -1258,16 +1310,61 @@ async function handleSendMessage() {
             
             const titleForConv = userMessage.length > 50 ? userMessage.substring(0, 50) + '...' : userMessage;
             
-            // Save AI message via PendingMessageQueue (handles retries and persistence)
-            // No await needed - queue handles background sync with localStorage backup
-            saveMessage('ai', aiResponse, convIdAtSend, userIdAtSend).catch(error => {
-                Logger.error(error, 'SendMessage', { operation: 'saveAIMessage' });
-            });
+            // Save AI message - use short timeout for responsiveness
+            const aiSavePromise = saveMessageDirect('ai', aiResponse, convIdAtSend, userIdAtSend);
             
-            // Update title in background (non-blocking)
-            updateConversationTitleIfNeeded(convIdAtSend, titleForConv).catch(err => {
-                Logger.warn(`Title update failed: ${err.message}`, 'SendMessage');
-            });
+            // Wait for both saves to complete (in parallel) before title update
+            // This ensures messages are in database before we check count
+            Promise.all([userSavePromise, aiSavePromise])
+                .then(([userResult, aiResult]) => {
+                    if (userResult.success && aiResult.success) {
+                        // Both saved directly - update title immediately
+                        Logger.info('Both messages saved directly, updating title', 'SendMessage');
+                        return updateConversationTitleIfNeeded(convIdAtSend, titleForConv);
+                    } else {
+                        // One or both saves fell back to queue
+                        // Register callback to update title when queue flushes
+                        const failedCount = (userResult.success ? 0 : 1) + (aiResult.success ? 0 : 1);
+                        Logger.info(`${failedCount} save(s) fell back to queue, registering callback`, 'SendMessage', {
+                            userSaved: userResult.success,
+                            aiSaved: aiResult.success
+                        });
+                        
+                        // Register callback with PendingMessageQueue
+                        if (typeof PendingMessageQueue !== 'undefined' && PendingMessageQueue.registerSaveCallback) {
+                            PendingMessageQueue.registerSaveCallback(
+                                convIdAtSend,
+                                failedCount, // Wait for this many queued saves
+                                () => {
+                                    Logger.info('Queue flush complete, updating title', 'SendMessage');
+                                    updateConversationTitleIfNeeded(convIdAtSend, titleForConv).catch(err => {
+                                        Logger.warn(`Queued title update failed: ${err.message}`, 'SendMessage');
+                                    });
+                                },
+                                600000 // 10 minute timeout for extended offline scenarios
+                            );
+                        } else {
+                            // Fallback: delayed retry if callback not available
+                            setTimeout(() => {
+                                updateConversationTitleIfNeeded(convIdAtSend, titleForConv).catch(() => {});
+                            }, 10000);
+                        }
+                    }
+                })
+                .catch(err => {
+                    Logger.warn(`Save promises failed: ${err.message}`, 'SendMessage');
+                    // Register callback for both messages
+                    if (typeof PendingMessageQueue !== 'undefined' && PendingMessageQueue.registerSaveCallback) {
+                        PendingMessageQueue.registerSaveCallback(
+                            convIdAtSend,
+                            2, // Wait for both messages
+                            () => {
+                                updateConversationTitleIfNeeded(convIdAtSend, titleForConv).catch(() => {});
+                            },
+                            600000 // 10 minute timeout
+                        );
+                    }
+                });
             
         } catch (error) {
             typingMessage.remove();
@@ -1320,17 +1417,26 @@ async function createNewConversation() {
 
 async function updateConversationTitleIfNeeded(conversationId, title) {
     try {
+        // Check message count - only update on first exchange (2 messages: user + AI)
         const countResult = await withTimeout(getMessageCount(conversationId), 10000);
         const messageCount = countResult.success ? countResult.data : 0;
         
+        Logger.info(`Checking title update: messageCount=${messageCount}`, CHAT_CONTEXT, { conversationId });
+        
+        // Only update title on the first message exchange (exactly 2 messages)
         if (messageCount === 2) {
-            const updateResult = await withTimeout(updateConversationTitle(conversationId, title), 120000);
+            const updateResult = await withTimeout(updateConversationTitle(conversationId, title), 30000);
             if (updateResult.success) {
+                Logger.info(`Conversation title updated to: ${title}`, CHAT_CONTEXT);
                 const updated = updateSidebarTitleLocally(conversationId, title);
                 if (!updated) {
                     loadConversationHistory().catch(() => {});
                 }
+            } else {
+                Logger.warn('Title update failed', CHAT_CONTEXT, { error: updateResult.error });
             }
+        } else {
+            Logger.info(`Skipping title update: messageCount=${messageCount} (need exactly 2)`, CHAT_CONTEXT);
         }
     } catch (error) {
         Logger.warn(`Title update skipped: ${error.message}`, CHAT_CONTEXT);
@@ -1858,6 +1964,128 @@ function getChatCompanyLogo(companyIdentifier) {
 
 window.getChatCompanyLogo = getChatCompanyLogo;
 
+/**
+ * Reconcile a single conversation's title if it's still untitled but has messages.
+ * @param {string} conversationId - The conversation to check
+ * @param {string} userId - The user ID
+ */
+async function reconcileSingleConversation(conversationId, userId) {
+    try {
+        // First check if conversation already has a title in the sidebar
+        const chatItem = document.querySelector(`.chat-item[data-conversation-id="${conversationId}"]`);
+        if (chatItem) {
+            const chatText = chatItem.querySelector('.chat-item-text');
+            const currentTitle = chatText?.textContent?.trim();
+            if (currentTitle && currentTitle !== 'New chat' && currentTitle !== '') {
+                return; // Already has a title
+            }
+        }
+        
+        // Check if conversation has at least 2 messages
+        const result = await getConversationMessages(conversationId);
+        if (!result.success || !result.data || result.data.length < 2) {
+            return; // Skip if fewer than 2 messages
+        }
+        
+        // Find the first user message for title generation
+        const userMessage = result.data.find(m => m.role === 'user');
+        if (!userMessage) {
+            return;
+        }
+        
+        // Generate title from user message
+        const title = userMessage.content.substring(0, 40).trim() + 
+            (userMessage.content.length > 40 ? '...' : '');
+        
+        // Update conversation title in database
+        // Note: updateConversationTitle signature is (conversationId, title)
+        const updateResult = await updateConversationTitle(conversationId, title);
+        if (updateResult.success) {
+            Logger.info(`Reconciled title for conversation ${conversationId}: "${title}"`, 'Reconcile');
+            
+            // Update sidebar UI
+            if (chatItem) {
+                const chatText = chatItem.querySelector('.chat-item-text');
+                if (chatText) {
+                    chatText.textContent = title;
+                }
+            }
+        }
+    } catch (e) {
+        Logger.warn(`Failed to reconcile conversation ${conversationId}: ${e.message}`, 'Reconcile');
+    }
+}
+
+let reconciliationUserId = null;
+let queueFlushListenerAttached = false;
+
+/**
+ * Handle queue flush events - reconcile immediately after each flush
+ * Uses actual state (message count + title) rather than counting flush events
+ */
+function handleQueueFlush(event) {
+    const { conversationId } = event.detail;
+    
+    if (!reconciliationUserId) {
+        const user = getCurrentUser();
+        reconciliationUserId = user?.id;
+    }
+    
+    if (!reconciliationUserId) return;
+    
+    Logger.info(`Queue flush for ${conversationId}, checking reconciliation`, 'Reconcile');
+    
+    // Reconcile on every flush - reconcileSingleConversation checks state:
+    // Only updates if conversation has 2+ messages AND no title
+    setTimeout(async () => {
+        await reconcileSingleConversation(conversationId, reconciliationUserId);
+    }, 300);
+}
+
+/**
+ * Initialize the queue flush listener - should be called once at startup
+ */
+function initQueueFlushListener() {
+    if (queueFlushListenerAttached) return;
+    
+    window.addEventListener('messageQueueFlush', handleQueueFlush);
+    queueFlushListenerAttached = true;
+    Logger.info('Queue flush listener attached', 'Reconcile');
+}
+
+/**
+ * Reconcile any "New chat" conversations that have messages but never got titled.
+ * This handles edge cases like page reload before title update completed,
+ * long offline periods, or network failures during title generation.
+ * Runs asynchronously in the background to not block UI.
+ */
+async function reconcileUntitledConversations(conversations, userId) {
+    // Store userId for flush listener
+    reconciliationUserId = userId;
+    
+    // Ensure flush listener is registered (unconditionally)
+    initQueueFlushListener();
+    
+    // Find untitled conversations (title is null, empty, or "New chat")
+    const untitled = conversations.filter(c => 
+        !c.title || c.title === 'New chat' || c.title.trim() === ''
+    );
+    
+    if (untitled.length === 0) {
+        Logger.info('No untitled conversations to reconcile on page load', 'Reconcile');
+        return;
+    }
+    
+    Logger.info(`Found ${untitled.length} untitled conversations to reconcile`, 'Reconcile');
+    
+    // Process in background, don't block UI
+    setTimeout(async () => {
+        for (const conv of untitled) {
+            await reconcileSingleConversation(conv.id, userId);
+        }
+    }, 2000); // Wait 2 seconds before starting reconciliation
+}
+
 async function initializeChat() {
     if (isInitialized) {
         Logger.info('Chat already initialized, skipping', CHAT_CONTEXT);
@@ -1880,6 +2108,10 @@ async function initializeChat() {
         
         const conversations = await loadConversationHistory();
         Logger.info(`Loaded ${conversations.length} conversations`, CHAT_CONTEXT);
+        
+        // Reconcile any orphaned "New chat" conversations that have messages
+        // This handles cases where page was reloaded before title update completed
+        reconcileUntitledConversations(conversations, user.id);
         
         if (conversations.length > 0) {
             await loadConversation(conversations[0].id);

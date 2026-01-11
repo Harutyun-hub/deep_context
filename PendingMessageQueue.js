@@ -12,6 +12,20 @@ const PendingMessageQueue = (function() {
     let flushTimer = null;
     let memoryQueue = [];
     let storageAvailable = true;
+    
+    // Callback registry for message save confirmations
+    // Key: conversationId, Value: { callback, requiredCount, savedCount }
+    const saveCallbacks = new Map();
+    
+    // Event emitter for queue flush events
+    function emitQueueFlush(conversationId) {
+        if (typeof window !== 'undefined') {
+            const event = new CustomEvent('messageQueueFlush', { 
+                detail: { conversationId } 
+            });
+            window.dispatchEvent(event);
+        }
+    }
 
     function checkStorageAvailable() {
         try {
@@ -114,6 +128,12 @@ const PendingMessageQueue = (function() {
                     const queue = getQueue();
                     const filtered = queue.filter(m => m.id !== entry.id);
                     saveQueue(filtered);
+                    
+                    // Trigger callback for this conversation (same as processMessage)
+                    triggerSaveCallback(entry.conversationId);
+                    
+                    // Emit event for any listeners (e.g., title reconciliation)
+                    emitQueueFlush(entry.conversationId);
                 }
             }
         } catch (e) {
@@ -150,6 +170,72 @@ const PendingMessageQueue = (function() {
         return delay + Math.random() * 500;
     }
 
+    /**
+     * Register a callback to be called when messages for a conversation are saved.
+     * The callback is invoked once requiredCount messages have been saved.
+     * @param {string} conversationId - The conversation ID to watch
+     * @param {number} requiredCount - Number of saves required before triggering callback
+     * @param {Function} callback - Function to call when saves complete
+     * @param {number} timeoutMs - Max time to wait before auto-cleanup (default 60s)
+     */
+    function registerSaveCallback(conversationId, requiredCount, callback, timeoutMs = 60000) {
+        saveCallbacks.set(conversationId, {
+            callback,
+            requiredCount,
+            savedCount: 0,
+            createdAt: Date.now()
+        });
+        
+        if (typeof Logger !== 'undefined') {
+            Logger.info(`Registered save callback for ${conversationId}, waiting for ${requiredCount} saves`, CONTEXT);
+        }
+        
+        // Auto-cleanup after timeout to prevent memory leaks
+        setTimeout(() => {
+            if (saveCallbacks.has(conversationId)) {
+                const entry = saveCallbacks.get(conversationId);
+                if (entry.savedCount < entry.requiredCount) {
+                    if (typeof Logger !== 'undefined') {
+                        Logger.warn(`Save callback timed out for ${conversationId} (${entry.savedCount}/${entry.requiredCount} saves)`, CONTEXT);
+                    }
+                }
+                saveCallbacks.delete(conversationId);
+            }
+        }, timeoutMs);
+    }
+
+    /**
+     * Trigger the save callback for a conversation if conditions are met.
+     * @param {string} conversationId - The conversation ID
+     */
+    function triggerSaveCallback(conversationId) {
+        if (!saveCallbacks.has(conversationId)) {
+            return;
+        }
+        
+        const entry = saveCallbacks.get(conversationId);
+        entry.savedCount++;
+        
+        if (typeof Logger !== 'undefined') {
+            Logger.info(`Save callback progress: ${entry.savedCount}/${entry.requiredCount} for ${conversationId}`, CONTEXT);
+        }
+        
+        if (entry.savedCount >= entry.requiredCount) {
+            // Invoke the callback
+            try {
+                entry.callback();
+                if (typeof Logger !== 'undefined') {
+                    Logger.info(`Save callback triggered for ${conversationId}`, CONTEXT);
+                }
+            } catch (e) {
+                console.error('[MessageQueue] Save callback error:', e);
+            }
+            
+            // Clean up
+            saveCallbacks.delete(conversationId);
+        }
+    }
+
     async function processMessage(entry) {
         if (entry.status === 'failed' || entry.attempts >= MAX_RETRIES) {
             return false;
@@ -183,6 +269,13 @@ const PendingMessageQueue = (function() {
                 if (typeof Logger !== 'undefined') {
                     Logger.info(`Message synced: ${entry.id}`, CONTEXT);
                 }
+                
+                // Trigger callback if registered for this conversation
+                triggerSaveCallback(entry.conversationId);
+                
+                // Emit event for any listeners (e.g., title reconciliation)
+                emitQueueFlush(entry.conversationId);
+                
                 return true;
             } else {
                 throw new Error(result.error?.message || 'Save failed');
@@ -306,7 +399,8 @@ const PendingMessageQueue = (function() {
         getStats,
         retryFailed,
         clearFailed,
-        getQueue
+        getQueue,
+        registerSaveCallback
     };
 })();
 
