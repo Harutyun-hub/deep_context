@@ -1984,7 +1984,52 @@ button:disabled {
     to { opacity: 1; }
 }
 
+/* Mobile menu toggle button - visible only on mobile */
+.mobile-menu-toggle {
+    display: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--glass-bg-medium);
+    border: 1px solid var(--glass-border-strong);
+    cursor: pointer;
+    color: var(--color-gray-700);
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.mobile-menu-toggle:hover {
+    background: var(--glass-bg-strong);
+}
+
+/* Mobile overlay for sidebar */
+.mobile-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.mobile-overlay.visible {
+    opacity: 1;
+}
+
 @media (max-width: 768px) {
+    /* Show mobile menu toggle */
+    .mobile-menu-toggle {
+        display: flex;
+    }
+    
+    /* Show overlay when sidebar is open */
+    .mobile-overlay.visible {
+        display: block;
+    }
+
     .sidebar {
         position: fixed;
         left: 0;
@@ -1992,6 +2037,7 @@ button:disabled {
         bottom: 0;
         z-index: 100;
         transform: translateX(-100%);
+        width: 280px;
     }
 
     .sidebar.open {
@@ -1999,16 +2045,91 @@ button:disabled {
     }
 
     .sidebar.collapsed {
-        width: 64px;
+        width: 280px;
         transform: translateX(-100%);
+    }
+    
+    .sidebar.collapsed.open {
+        transform: translateX(0);
+    }
+    
+    /* Show all text in mobile sidebar even if collapsed */
+    .sidebar.collapsed .brand-text,
+    .sidebar.collapsed .btn-text,
+    .sidebar.collapsed .nav-text,
+    .sidebar.collapsed .recent-chats,
+    .sidebar.collapsed .recent-header {
+        display: block;
+    }
+    
+    .sidebar.collapsed .sidebar-brand {
+        display: flex;
+    }
+    
+    .sidebar.collapsed .new-chat-btn {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 10px 12px;
+    }
+    
+    .sidebar.collapsed .nav-item {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 10px 12px;
+    }
+    
+    .sidebar.collapsed .settings-btn {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 10px 12px;
     }
 
     .chat-header {
         padding: 12px 16px;
     }
+    
+    /* Reposition header elements for mobile */
+    .chat-header .header-left {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    /* Hide aggression HUD in header-left on mobile - show below header instead */
+    .chat-header .aggression-hud {
+        position: static;
+        transform: none;
+        order: 10;
+        width: 100%;
+        justify-content: center;
+        margin-top: 8px;
+    }
+    
+    /* Adjust header title size for mobile */
+    .header-title {
+        font-size: 16px;
+    }
 
     .chat-container {
         padding: 16px;
+        overflow-x: hidden;
+    }
+    
+    /* Prevent horizontal scroll in messages */
+    .message-list {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+    
+    .message-content {
+        max-width: 85%;
+        overflow-x: hidden;
+        word-break: break-word;
+    }
+    
+    /* Allow tables inside messages to scroll horizontally */
+    .message-content .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .input-area {
@@ -2018,11 +2139,17 @@ button:disabled {
     .table-wrapper {
         margin: 12px 0;
         border-radius: 12px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .table-title {
         font-size: 15px;
         padding: 16px 16px 12px;
+    }
+
+    .data-table {
+        min-width: 500px;
     }
 
     .data-table th {
@@ -2114,6 +2241,16 @@ button:disabled {
 
     .media-placeholder-text {
         font-size: 13px;
+    }
+    
+    /* Welcome message adjustments */
+    .welcome-greeting,
+    .welcome-subtitle {
+        font-size: 24px;
+    }
+    
+    .welcome-gravity-logo {
+        width: 100px;
     }
 }
 

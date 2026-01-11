@@ -30,6 +30,7 @@
         </div>
 
         <div class="main-layout">
+            <div class="mobile-overlay" id="mobileOverlay"></div>
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-header">
                     <div class="sidebar-brand">
@@ -101,6 +102,11 @@
             <main class="main-content">
                 <header class="chat-header">
                     <div class="header-left">
+                        <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor"/>
+                            </svg>
+                        </button>
                         <div class="ai-avatar">
                             <img src="attached_assets/Deep_context_loro_round_1767381913100.png" alt="Deep Context" class="ai-avatar-logo">
                         </div>
@@ -255,9 +261,41 @@
 
         const collapseBtn = document.getElementById('collapseBtn');
         const sidebar = document.getElementById('sidebar');
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const mobileOverlay = document.getElementById('mobileOverlay');
         
         collapseBtn.addEventListener('click', function() {
             sidebar.classList.toggle('collapsed');
+        });
+        
+        // Mobile menu toggle functionality
+        function openMobileMenu() {
+            sidebar.classList.add('open');
+            mobileOverlay.classList.add('visible');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeMobileMenu() {
+            sidebar.classList.remove('open');
+            mobileOverlay.classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+        
+        if (mobileMenuToggle) {
+            mobileMenuToggle.addEventListener('click', openMobileMenu);
+        }
+        
+        if (mobileOverlay) {
+            mobileOverlay.addEventListener('click', closeMobileMenu);
+        }
+        
+        // Close mobile menu when clicking nav items
+        document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    closeMobileMenu();
+                }
+            });
         });
         
         function renderThreatUI(threatData) {

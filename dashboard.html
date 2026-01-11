@@ -25,6 +25,7 @@
         </div>
 
         <div class="main-layout">
+            <div class="mobile-overlay" id="mobileOverlay"></div>
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-header">
                     <div class="sidebar-brand">
@@ -96,9 +97,19 @@
             
             <main class="dashboard-main">
                 <header class="dashboard-header">
-                    <div class="header-info">
-                        <h1 class="header-title">Competitive Intelligence Suite</h1>
-                        <p class="header-subtitle">Market Analysis & Competitor Tracking</p>
+                    <div class="header-logo-section">
+                        <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor"/>
+                            </svg>
+                        </button>
+                        <div class="ai-avatar">
+                            <img src="attached_assets/Deep_context_loro_round_1767381913100.png" alt="Deep Context" class="ai-avatar-logo">
+                        </div>
+                        <div class="header-info">
+                            <h1 class="header-title">Competitive Intelligence Suite</h1>
+                            <p class="header-subtitle">Market Analysis & Competitor Tracking</p>
+                        </div>
                     </div>
                     <div class="aggression-hud" id="aggressionHud" style="display: none;">
                         <span class="aggression-hud-dot" id="aggressionDot"></span>
@@ -106,13 +117,19 @@
                         <span class="aggression-hud-value" id="aggressionValue">--</span>
                     </div>
                     <div class="header-actions">
+                        <button class="refresh-btn" id="backToChat" onclick="window.location.href='/index.html'">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" fill="currentColor"/>
+                            </svg>
+                            <span>Back</span>
+                        </button>
                         <button class="refresh-btn" id="refreshBtn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                 <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/>
                             </svg>
                             <span>Refresh</span>
                         </button>
-                        <button class="refresh-btn" id="logoutBtn" style="margin-left: 8px;">
+                        <button class="refresh-btn" id="logoutBtn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                 <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" fill="currentColor"/>
                             </svg>
@@ -528,9 +545,41 @@
     <script>
         const collapseBtn = document.getElementById('collapseBtn');
         const sidebar = document.getElementById('sidebar');
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const mobileOverlay = document.getElementById('mobileOverlay');
         
         collapseBtn.addEventListener('click', function() {
             sidebar.classList.toggle('collapsed');
+        });
+        
+        // Mobile menu toggle functionality
+        function openMobileMenu() {
+            sidebar.classList.add('open');
+            mobileOverlay.classList.add('visible');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeMobileMenu() {
+            sidebar.classList.remove('open');
+            mobileOverlay.classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+        
+        if (mobileMenuToggle) {
+            mobileMenuToggle.addEventListener('click', openMobileMenu);
+        }
+        
+        if (mobileOverlay) {
+            mobileOverlay.addEventListener('click', closeMobileMenu);
+        }
+        
+        // Close mobile menu when clicking nav items
+        document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    closeMobileMenu();
+                }
+            });
         });
 
         document.getElementById('logoutBtn').addEventListener('click', async function() {

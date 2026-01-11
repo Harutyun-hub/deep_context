@@ -760,10 +760,14 @@
 @media (max-width: 768px) {
     .pillar-tabs {
         flex-wrap: wrap;
+        padding: 12px;
+        gap: 6px;
     }
     
     .pillar-tab {
         flex: 1 1 45%;
+        padding: 10px 12px;
+        font-size: 13px;
     }
     
     .pillar-tab span {
@@ -781,6 +785,48 @@
     
     .screenshots-grid {
         grid-template-columns: 1fr;
+    }
+    
+    /* Creative Strategy tabs - prevent horizontal scroll */
+    .creative-tabs,
+    .espionage-tabs {
+        flex-wrap: wrap;
+        gap: 6px;
+        overflow-x: hidden;
+    }
+    
+    .creative-tab,
+    .espionage-tab {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 8px 10px;
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .creative-tab svg,
+    .espionage-tab svg {
+        flex-shrink: 0;
+        width: 14px;
+        height: 14px;
+    }
+    
+    /* Pillar header adjustments */
+    .pillar-header h2 {
+        font-size: 20px;
+    }
+    
+    .pillar-header p {
+        font-size: 13px;
+    }
+    
+    /* Gallery adjustments */
+    .gallery-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
     }
 }
 
