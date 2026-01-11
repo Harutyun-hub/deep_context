@@ -281,8 +281,16 @@
             document.body.style.overflow = '';
         }
         
+        function toggleMobileMenu() {
+            if (sidebar.classList.contains('open')) {
+                closeMobileMenu();
+            } else {
+                openMobileMenu();
+            }
+        }
+        
         if (mobileMenuToggle) {
-            mobileMenuToggle.addEventListener('click', openMobileMenu);
+            mobileMenuToggle.addEventListener('click', toggleMobileMenu);
         }
         
         if (mobileOverlay) {
