@@ -5,6 +5,9 @@ let authInitialized = false;
 
 const AUTH_CONTEXT = 'Auth';
 
+// Store the last known session to avoid calling getSession() which can hang
+let cachedSession = null;
+
 async function initAuth() {
     if (authInitPromise) {
         Logger.info('Auth initialization already in progress, waiting...', AUTH_CONTEXT);
@@ -12,9 +15,10 @@ async function initAuth() {
     }
     
     if (authInitialized && authSupabase) {
-        Logger.info('Auth already initialized, returning existing session', AUTH_CONTEXT);
-        const { data: { session } } = await authSupabase.auth.getSession();
-        return session;
+        // CRITICAL FIX: Return cached session instead of calling getSession()
+        // getSession() can hang indefinitely due to Supabase deadlock bugs
+        Logger.info('Auth already initialized, returning cached session', AUTH_CONTEXT);
+        return cachedSession;
     }
     
     authInitPromise = _performAuthInit();
@@ -22,6 +26,7 @@ async function initAuth() {
     try {
         const result = await authInitPromise;
         authInitialized = true;
+        cachedSession = result;
         return result;
     } finally {
         authInitPromise = null;
@@ -59,12 +64,22 @@ async function _performAuthInit() {
                 expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'unknown'
             });
             currentUser = session.user;
-            await ensureUserExists(session.user);
+            // CRITICAL FIX: Defer ensureUserExists to avoid blocking auth init
+            // This prevents deadlocks per GitHub Issue #762
+            setTimeout(() => {
+                ensureUserExists(session.user).catch(err => 
+                    Logger.error(err, AUTH_CONTEXT, { operation: 'deferred-ensureUserExists' })
+                );
+            }, 0);
         } else {
             Logger.info('No existing session found', AUTH_CONTEXT);
         }
         
-        authSupabase.auth.onAuthStateChange(async (event, session) => {
+        // CRITICAL FIX: onAuthStateChange callback must be SYNCHRONOUS
+        // Using async/await inside causes deadlocks where all subsequent 
+        // getSession() calls hang forever (GitHub Issue #762)
+        // Solution: Use setTimeout(..., 0) to defer async work
+        authSupabase.auth.onAuthStateChange((event, session) => {
             Logger.info(`Auth state change: ${event}`, AUTH_CONTEXT, {
                 hasSession: !!session,
                 timestamp: new Date().toISOString()
@@ -75,13 +90,24 @@ async function _performAuthInit() {
                 Logger.info(`Session expires at: ${expiresAt}`, AUTH_CONTEXT);
             }
             
+            // Always update cached session when we get a new one
+            if (session) {
+                cachedSession = session;
+            }
+            
             if (event === 'SIGNED_IN' && session) {
                 Logger.info('User signed in successfully', AUTH_CONTEXT, { userId: session.user?.id });
                 currentUser = session.user;
-                await ensureUserExists(session.user);
+                // Defer async work to prevent deadlock
+                setTimeout(() => {
+                    ensureUserExists(session.user).catch(err => 
+                        Logger.error(err, AUTH_CONTEXT, { operation: 'onAuthStateChange-ensureUserExists' })
+                    );
+                }, 0);
             } else if (event === 'SIGNED_OUT') {
                 Logger.info('User signed out', AUTH_CONTEXT);
                 currentUser = null;
+                cachedSession = null;
             } else if (event === 'TOKEN_REFRESHED') {
                 Logger.info('Token refreshed successfully', AUTH_CONTEXT);
                 if (session) {
@@ -119,113 +145,89 @@ function onVisibilityChange() {
 
 /**
  * Ensures the connection is ready before heavy database operations.
- * This "warms up" the connection by:
- * 1. Awaiting session refresh (not fire-and-forget)
- * 2. Running a lightweight ping query to wake up the network path
+ * SIMPLIFIED: Only does a lightweight ping - avoids getSession() which can hang
+ * due to Supabase deadlock bugs (GitHub Issues #762, #1594, #35754)
  * 
  * @param {number} timeoutMs - Maximum time to wait (default 3000ms)
  * @returns {Promise<{ready: boolean, session: object|null, error: string|null}>}
  */
 async function ensureConnectionReady(timeoutMs = 3000) {
     const startTime = Date.now();
-    Logger.info('Connection warm-up starting...', AUTH_CONTEXT);
+    Logger.info('Connection warm-up starting (ping-only mode)...', AUTH_CONTEXT);
     
     if (!authSupabase) {
         Logger.warn('ensureConnectionReady: No Supabase client available', AUTH_CONTEXT);
         return { ready: false, session: null, error: 'No Supabase client' };
     }
     
-    // Use explicit timeout control with clearTimeout to avoid race conditions
+    // Get cached user without calling getSession (which can hang)
+    const user = currentUser;
+    if (!user) {
+        Logger.warn('ensureConnectionReady: No cached user, skipping ping', AUTH_CONTEXT);
+        // Return ready=false so callers can decide how to handle
+        return { ready: false, session: null, error: 'No cached user' };
+    }
+    
     let timeoutId = null;
-    let timedOut = false;
     
     try {
         // Create a promise that rejects on timeout
         const timeoutPromise = new Promise((_, reject) => {
             timeoutId = setTimeout(() => {
-                timedOut = true;
                 reject(new Error('Connection warm-up timeout'));
             }, timeoutMs);
         });
         
-        // The actual warm-up work
-        const warmupPromise = (async () => {
-            // Step 1: Await session refresh (this is the key fix - NOT fire-and-forget)
-            Logger.info('Warm-up Step 1: Refreshing session...', AUTH_CONTEXT);
-            const sessionStart = Date.now();
-            
-            const { data: { session }, error: sessionError } = await authSupabase.auth.getSession();
-            
-            // Check if we timed out while waiting
-            if (timedOut) return null;
-            
-            const sessionDuration = Date.now() - sessionStart;
-            Logger.info(`Warm-up Step 1 complete: Session refresh took ${sessionDuration}ms`, AUTH_CONTEXT);
-            
-            if (sessionError) {
-                Logger.error(sessionError, AUTH_CONTEXT, { operation: 'warmup-session' });
-                return { ready: false, session: null, error: sessionError.message };
-            }
-            
-            if (!session) {
-                Logger.warn('Warm-up: No active session found', AUTH_CONTEXT);
-                return { ready: false, session: null, error: 'No active session' };
-            }
-            
-            // Step 2: Lightweight ping query to wake up the network path
-            Logger.info('Warm-up Step 2: Pinging database...', AUTH_CONTEXT);
+        // Simple ping query - no getSession() call (avoids deadlock)
+        const pingPromise = (async () => {
+            Logger.info('Warm-up: Pinging database...', AUTH_CONTEXT);
             const pingStart = Date.now();
             
-            const { data: pingData, error: pingError } = await authSupabase
+            const { error: pingError } = await authSupabase
                 .from('users')
                 .select('id')
-                .eq('id', session.user.id)
+                .eq('id', user.id)
                 .single();
             
-            // Check if we timed out while waiting
-            if (timedOut) return null;
-            
             const pingDuration = Date.now() - pingStart;
-            Logger.info(`Warm-up Step 2 complete: Ping took ${pingDuration}ms`, AUTH_CONTEXT);
             
             if (pingError && pingError.code !== 'PGRST116') {
-                // PGRST116 is "not found" which is fine for a ping
-                Logger.warn('Warm-up ping warning (non-fatal)', AUTH_CONTEXT, { error: pingError.message });
+                Logger.warn('Warm-up ping failed', AUTH_CONTEXT, { 
+                    error: pingError.message,
+                    duration: pingDuration 
+                });
+                return { ready: false, session: cachedSession, error: pingError.message };
             }
             
-            const totalDuration = Date.now() - startTime;
-            Logger.info(`Connection warm-up SUCCESS in ${totalDuration}ms`, AUTH_CONTEXT);
-            
-            return { ready: true, session, error: null };
+            Logger.info(`Warm-up ping SUCCESS in ${pingDuration}ms`, AUTH_CONTEXT);
+            return { ready: true, session: cachedSession, error: null };
         })();
         
-        // Race between the warm-up and timeout
-        const result = await Promise.race([warmupPromise, timeoutPromise]);
+        const result = await Promise.race([pingPromise, timeoutPromise]);
         
-        // CRITICAL: Clear the timeout to prevent lingering timer
         if (timeoutId) {
             clearTimeout(timeoutId);
-            timeoutId = null;
         }
         
-        return result || { ready: false, session: null, error: 'Warm-up cancelled' };
+        const totalDuration = Date.now() - startTime;
+        Logger.info(`Connection warm-up complete in ${totalDuration}ms`, AUTH_CONTEXT);
+        
+        return result;
         
     } catch (error) {
-        // Clear timeout on error too
         if (timeoutId) {
             clearTimeout(timeoutId);
-            timeoutId = null;
         }
         
         const duration = Date.now() - startTime;
         
         if (error.message === 'Connection warm-up timeout') {
             Logger.warn(`Connection warm-up TIMEOUT after ${duration}ms`, AUTH_CONTEXT);
-            return { ready: false, session: null, error: 'Timeout - connection may be stale' };
+            return { ready: false, session: cachedSession, error: 'Timeout - connection may be stale' };
         }
         
         Logger.error(error, AUTH_CONTEXT, { operation: 'ensureConnectionReady', duration });
-        return { ready: false, session: null, error: error.message };
+        return { ready: false, session: cachedSession, error: error.message };
     }
 }
 

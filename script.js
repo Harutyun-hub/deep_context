@@ -287,7 +287,8 @@ function handleVisibilityChange() {
 let warmupInProgress = false;
 let pendingWarmupRequest = null;
 
-// Async handler for tab resume - warms up connection before retrying loads
+// SIMPLIFIED: Tab resume handler - just trigger background refresh and retry stuck loads
+// No longer uses blocking ensureConnectionReady which caused deadlocks
 async function handleVisibilityResume(hiddenDuration) {
     // Debounce: If a warm-up is already in progress, queue this request
     if (warmupInProgress) {
@@ -299,51 +300,27 @@ async function handleVisibilityResume(hiddenDuration) {
     warmupInProgress = true;
     
     try {
-        // If tab was hidden for more than 2 seconds, do a proper warm-up
-        if (hiddenDuration > 2000) {
-            Logger.info(`Tab was hidden for ${Math.round(hiddenDuration/1000)}s, warming up connection...`, 'Visibility');
-            
-            // Use Auth.ensureConnectionReady if available, otherwise fallback to fire-and-forget
-            if (typeof Auth !== 'undefined' && Auth.ensureConnectionReady) {
-                const warmupResult = await Auth.ensureConnectionReady(3000);
-                
-                if (!warmupResult.ready) {
-                    Logger.warn(`Connection warm-up failed: ${warmupResult.error}`, 'Visibility');
-                    // Show a subtle reconnecting indicator (don't block UI)
-                    showReconnectingIndicator();
-                    
-                    // Try one more time with a longer timeout
-                    const retryResult = await Auth.ensureConnectionReady(5000);
-                    hideReconnectingIndicator();
-                    
-                    if (!retryResult.ready) {
-                        Logger.error(new Error(`Connection warm-up failed after retry: ${retryResult.error}`), 'Visibility');
-                        // Don't retry loads - let user manually click
-                        return;
-                    }
-                }
-                
-                Logger.info('Connection warm-up successful, checking for stuck loads...', 'Visibility');
-            } else {
-                // Fallback to old fire-and-forget behavior
-                if (typeof onVisibilityChange === 'function') {
-                    onVisibilityChange();
-                }
-            }
-        } else {
-            // Short hide, just do fire-and-forget refresh
-            if (typeof onVisibilityChange === 'function') {
-                onVisibilityChange();
-            }
+        // Trigger background session refresh (fire-and-forget - never blocks)
+        if (typeof Auth !== 'undefined' && Auth.onVisibilityChange) {
+            Auth.onVisibilityChange();
         }
         
-        // Auto-retry stuck loads: if loading has been stuck for > 3 seconds, cancel and retry
+        // Log the resume
+        if (hiddenDuration > 2000) {
+            Logger.info(`Tab was hidden for ${Math.round(hiddenDuration/1000)}s, triggered background refresh`, 'Visibility');
+        }
+        
+        // Auto-retry stuck loads: if loading has been stuck for > 5 seconds, cancel and retry
         if (isLoadingConversation && loadingStartTime && currentConversationId) {
             const stuckDuration = Date.now() - loadingStartTime;
-            if (stuckDuration > 3000) {
-                Logger.info(`Stuck load detected (${Math.round(stuckDuration/1000)}s), auto-retrying after warm-up...`, 'Visibility');
+            if (stuckDuration > 5000) {
+                Logger.info(`Stuck load detected (${Math.round(stuckDuration/1000)}s), auto-retrying...`, 'Visibility');
                 const conversationToRetry = currentConversationId;
                 cancelConversationLoad();
+                
+                // Small delay to let background refresh complete
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
                 // Use .catch() to prevent unhandled rejection noise
                 loadConversation(conversationToRetry).catch(err => {
                     Logger.warn(`Auto-retry failed: ${err.message}`, 'Visibility');
@@ -1379,15 +1356,16 @@ async function loadConversation(conversationId) {
     const messagesContainer = document.getElementById('messages');
     const previousConversationId = currentConversationId;
     
-    // CONNECTIVITY GATEKEEPER: Verify connection is alive before database queries
-    // This prevents 30-second hangs when returning from sleep/tab restore
-    if (typeof ensureConnectionReady === 'function') {
-        Logger.info('Running connection pre-flight check...', 'LoadConv', { loadRequestId });
-        const connectionStatus = await ensureConnectionReady(3000);
+    // CONNECTIVITY CHECK: Quick ping with retry logic
+    // Uses simplified ping-only approach to avoid getSession() deadlocks (GitHub Issue #762)
+    if (typeof Auth !== 'undefined' && Auth.ensureConnectionReady) {
+        Logger.info('Running connection ping...', 'LoadConv', { loadRequestId });
         
-        // Check if this load was cancelled while waiting for pre-flight
+        const connectionStatus = await Auth.ensureConnectionReady(3000);
+        
+        // Check if this load was cancelled
         if (thisLoadId !== currentLoadId || currentLoadAbortController?.signal.aborted) {
-            Logger.info('Load cancelled during pre-flight check', 'LoadConv', { loadRequestId });
+            Logger.info('Load cancelled during ping', 'LoadConv', { loadRequestId });
             isLoadingConversation = false;
             return;
         }
@@ -1395,81 +1373,39 @@ async function loadConversation(conversationId) {
         if (!connectionStatus.ready) {
             Logger.warn(`Connection not ready: ${connectionStatus.error}`, 'LoadConv', { loadRequestId });
             
-            // Track retry count using a global counter
+            // Track retry count
             window._connectionRetryCount = (window._connectionRetryCount || 0) + 1;
             const MAX_RETRIES = 3;
             
             if (window._connectionRetryCount > MAX_RETRIES) {
-                Logger.warn(`Max retries (${MAX_RETRIES}) exceeded, attempting client reinit`, 'LoadConv');
+                Logger.warn(`Max retries (${MAX_RETRIES}) exceeded`, 'LoadConv');
                 
-                // Show reinitializing indicator
+                // Show reconnect UI
                 messagesContainer.innerHTML = `
-                    <div class="syncing-indicator">
-                        <div class="syncing-spinner"></div>
-                        <span>Reinitializing connection...</span>
+                    <div class="reconnect-container">
+                        <div class="reconnect-icon">&#x26A0;</div>
+                        <div class="reconnect-message">Connection issue - please try again</div>
+                        <button class="reconnect-button" onclick="window.handleReconnect('${conversationId}')">Reconnect</button>
                     </div>`;
-                
-                // Attempt client reinitialization and auto-retry
-                if (typeof SupabaseManager !== 'undefined' && SupabaseManager.reinitialize) {
-                    const savedConversationId = conversationId;
-                    const savedLoadId = thisLoadId;
-                    
-                    SupabaseManager.reinitialize().then(() => {
-                        Logger.info('Client reinitialized successfully, auto-retrying load', 'LoadConv');
-                        window._connectionRetryCount = 0;
-                        
-                        // Only auto-retry if this is still the current load
-                        if (savedLoadId === currentLoadId) {
-                            loadConversation(savedConversationId).catch(e => {
-                                Logger.error(e, 'LoadConv', { operation: 'post-reinit-load' });
-                            });
-                        }
-                    }).catch(e => {
-                        Logger.error(e, 'LoadConv', { operation: 'reinitialize' });
-                        
-                        // Show reconnect button only if reinit failed
-                        if (savedLoadId === currentLoadId) {
-                            messagesContainer.innerHTML = `
-                                <div class="reconnect-container">
-                                    <div class="reconnect-icon">&#x26A0;</div>
-                                    <div class="reconnect-message">Connection lost</div>
-                                    <button class="reconnect-button" onclick="window.handleReconnect('${savedConversationId}')">Reconnect</button>
-                                </div>`;
-                        }
-                    });
-                } else {
-                    // No reinitialize available, show manual reconnect
-                    messagesContainer.innerHTML = `
-                        <div class="reconnect-container">
-                            <div class="reconnect-icon">&#x26A0;</div>
-                            <div class="reconnect-message">Connection lost</div>
-                            <button class="reconnect-button" onclick="window.handleReconnect('${conversationId}')">Reconnect</button>
-                        </div>`;
-                }
                 
                 isLoadingConversation = false;
                 return;
             }
             
-            // Show subtle syncing indicator with retry count
+            // Show syncing indicator and auto-retry
             messagesContainer.innerHTML = `
                 <div class="syncing-indicator">
                     <div class="syncing-spinner"></div>
                     <span>Syncing... (attempt ${window._connectionRetryCount}/${MAX_RETRIES})</span>
                 </div>`;
             
-            // Trigger background session refresh to wake up the connection
-            if (typeof authSupabase !== 'undefined' && authSupabase) {
-                authSupabase.auth.getSession().catch(() => {});
-            }
-            
-            // Schedule auto-retry after 2 seconds
+            // Schedule auto-retry after 1.5 seconds
             setTimeout(() => {
                 if (thisLoadId === currentLoadId) {
-                    Logger.info('Auto-retrying conversation load after sync...', 'LoadConv', { loadRequestId });
+                    Logger.info('Auto-retrying conversation load...', 'LoadConv', { loadRequestId });
                     loadConversation(conversationId).catch(() => {});
                 }
-            }, 2000);
+            }, 1500);
             
             isLoadingConversation = false;
             return;
@@ -1477,7 +1413,7 @@ async function loadConversation(conversationId) {
         
         // Connection successful - reset retry counter
         window._connectionRetryCount = 0;
-        Logger.info('Connection pre-flight passed', 'LoadConv', { loadRequestId });
+        Logger.info('Connection ping passed', 'LoadConv', { loadRequestId });
     }
     
     // OPTIMISTIC: Update UI immediately - no waiting
