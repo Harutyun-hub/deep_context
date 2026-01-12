@@ -45,6 +45,26 @@ function normalizeEnvelope(response) {
             }));
         }
 
+        if (answerType === 'images' && envelope.images && Array.isArray(envelope.images)) {
+            normalizedData = envelope.images.map(item => ({
+                url: item.url || item.src || item.image || '',
+                caption: item.label || item.caption || item.title || '',
+                description: item.description || '',
+                media_type: 'image'
+            }));
+        }
+
+        if (answerType === 'chart' && envelope.series && Array.isArray(envelope.series) && envelope.series.length > 0) {
+            const series = envelope.series[0];
+            if (series.data && Array.isArray(series.data)) {
+                normalizedData = series.data.map(item => ({
+                    name: item.category || item.name || item.label || '',
+                    label: item.category || item.name || item.label || '',
+                    value: item.value || item.count || 0
+                }));
+            }
+        }
+
         return {
             answer_type: answerType,
             title: envelope.title || '',
@@ -54,7 +74,8 @@ function normalizeEnvelope(response) {
             note: envelope.note || '',
             summary: envelope.summary || '',
             key_points: envelope.key_points || [],
-            recommendations: envelope.recommendations || []
+            recommendations: envelope.recommendations || [],
+            series: envelope.series || []
         };
     } catch (error) {
         console.error('Error normalizing envelope:', error);
@@ -71,6 +92,7 @@ function renderMessage(content) {
             chart: renderChart,
             table: renderTable,
             media_gallery: renderMediaGallery,
+            images: renderImages,
             insights: renderInsights
         };
 
@@ -116,7 +138,7 @@ function renderChart(envelope) {
         return renderTitleAndNote(envelope) + '<p class="empty-state">No data available for chart</p>';
     }
 
-    const labels = data.map(d => d.name || d.label || '');
+    const labels = data.map(d => d.category || d.name || d.label || '');
     const chartType = envelope.chart_type || 'bar';
     
     const hasMultipleDatasets = data[0] && (data[0].value2 !== undefined || data[0].values !== undefined);
@@ -599,6 +621,106 @@ function renderMediaGallery(envelope) {
         
         if (caption) {
             html += `<div class="media-caption">${escapeHtml(caption)}</div>`;
+        }
+        
+        html += '</div>';
+    });
+    
+    html += '</div>';
+    
+    return html;
+}
+
+function renderImages(envelope) {
+    const items = envelope.data || [];
+    const title = envelope.title || '';
+    const note = envelope.note || envelope.text || '';
+    
+    console.log('Rendering images with items:', items);
+    
+    if (!items.length) {
+        return renderTitleAndNote(envelope) + '<p class="empty-state">No images available</p>';
+    }
+
+    let html = '';
+    
+    if (title) {
+        html += `<div class="images-title">${escapeHtml(title)}</div>`;
+    }
+    
+    if (note) {
+        html += `<div class="message-note">${escapeHtml(note)}</div>`;
+    }
+    
+    html += '<div class="images-gallery">';
+    
+    items.forEach((item, index) => {
+        const url = item.url || '';
+        const caption = item.caption || item.label || '';
+        const description = item.description || '';
+        
+        console.log(`Image item ${index}:`, { url, caption, description });
+        
+        const imageId = 'img-' + Math.random().toString(36).substr(2, 9);
+        
+        html += '<div class="image-card">';
+        
+        if (url && url.match(/^https?:\/\//)) {
+            html += `<div class="image-container">
+                <img id="${imageId}" src="${escapeHtml(url)}" alt="${escapeHtml(caption || 'Image')}" class="image-display" loading="lazy" crossorigin="anonymous" referrerpolicy="no-referrer">
+                <div class="image-placeholder" id="placeholder-${imageId}" style="display: none;">
+                    <div class="image-placeholder-content">
+                        <div class="image-placeholder-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21,15 16,10 5,21"/>
+                            </svg>
+                        </div>
+                        <div class="image-placeholder-text">Image could not be loaded</div>
+                    </div>
+                </div>
+            </div>`;
+            
+            setTimeout(() => {
+                const img = document.getElementById(imageId);
+                if (img) {
+                    img.onerror = function() {
+                        console.log('Image failed to load:', url);
+                        this.style.display = 'none';
+                        const placeholder = document.getElementById('placeholder-' + imageId);
+                        if (placeholder) {
+                            placeholder.style.display = 'flex';
+                        }
+                    };
+                }
+            }, 10);
+        } else {
+            html += `<div class="image-container">
+                <div class="image-placeholder">
+                    <div class="image-placeholder-content">
+                        <div class="image-placeholder-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21,15 16,10 5,21"/>
+                            </svg>
+                        </div>
+                        <div class="image-placeholder-text">Image not available</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+        
+        if (caption || description) {
+            html += '<div class="image-info">';
+            if (caption) {
+                html += `<div class="image-caption">${escapeHtml(caption)}</div>`;
+            }
+            if (description) {
+                html += `<div class="image-description">${escapeHtml(description)}</div>`;
+            }
+            html += '</div>';
         }
         
         html += '</div>';
