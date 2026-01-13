@@ -16,9 +16,6 @@ class Logger {
     static _flushingBuffer = false;
     static _flushTimer = null;
     static _lastFlushTime = 0;
-    static _persistenceDisabled = false;
-    static _failureCount = 0;
-    static MAX_FAILURES = 3;
 
     static BATCH_SIZE = 20;
     static FLUSH_INTERVAL = 30000;
@@ -68,7 +65,7 @@ class Logger {
     }
 
     static async _flushBuffer() {
-        if (this._flushingBuffer || this._logBuffer.length === 0 || this._persistenceDisabled) return;
+        if (this._flushingBuffer || this._logBuffer.length === 0) return;
         
         this._flushingBuffer = true;
         this._lastFlushTime = Date.now();
@@ -77,20 +74,14 @@ class Logger {
         
         try {
             await this._batchPersistLogs(logsToFlush);
-            this._failureCount = 0;
+            console.log(`%c[Logger]%c Flushed ${logsToFlush.length} logs in batch`, this.STYLES.info, 'color: inherit;');
         } catch (e) {
-            this._failureCount++;
-            if (this._failureCount >= this.MAX_FAILURES) {
-                this._persistenceDisabled = true;
-                console.warn('[Logger] Database logging disabled after repeated failures (RLS policy). Logs will only appear in console.');
-                this._logBuffer = [];
-            } else if (this._failureCount === 1) {
-                console.warn('[Logger] Batch flush failed:', e.message);
-            }
+            console.warn('[Logger] Batch flush failed:', e.message);
+            this._logBuffer.unshift(...logsToFlush);
         } finally {
             this._flushingBuffer = false;
             
-            if (this._logBuffer.length >= this.BATCH_SIZE && !this._persistenceDisabled) {
+            if (this._logBuffer.length >= this.BATCH_SIZE) {
                 this._scheduleFlush(100);
             }
         }
