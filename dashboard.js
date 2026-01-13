@@ -5,31 +5,28 @@ const tableConfigs = {
     facebook: {
         tableName: 'facebook_ads',
         columns: [
+            { key: 'page_name', label: 'Page Name' },
             { key: 'publisher_platform', label: 'Platform' },
-            { key: 'ad_text', label: 'Ad Text' },
-            { key: 'url', label: 'URL', type: 'link' },
-            { key: 'ad_image_url', label: 'Image', type: 'link' },
-            { key: 'ad_cta_type', label: 'CTA Type' },
-            { key: 'ad_display_format', label: 'Format' },
+            { key: 'url', label: 'Ad URL', type: 'link' },
             { key: 'start_date_string', label: 'Start Date' },
             { key: 'end_date_string', label: 'End Date' }
         ],
         dateField: 'snapshot_date',
-        companyField: 'company_name',
+        companyField: 'handle',
         companyColumnLabel: 'Company'
     },
     google: {
         tableName: 'google_ads',
         columns: [
             { key: 'advertiser_id', label: 'Advertiser ID' },
-            { key: 'url', label: 'URL', type: 'link' },
+            { key: 'url', label: 'Ad URL', type: 'link' },
             { key: 'format', label: 'Format' },
             { key: 'image_url', label: 'Image', type: 'link' },
             { key: 'first_shown', label: 'First Shown' },
             { key: 'last_shown', label: 'Last Shown' }
         ],
         dateField: 'snapshot_date',
-        companyField: 'company_name',
+        companyField: 'handle',
         companyColumnLabel: 'Company'
     },
     instagram: {
@@ -42,7 +39,7 @@ const tableConfigs = {
             { key: 'url', label: 'URL', type: 'link' }
         ],
         dateField: 'snapshot_date',
-        companyField: 'company_name',
+        companyField: 'handle',
         companyColumnLabel: 'Company'
     }
 };
@@ -177,16 +174,10 @@ async function loadAllData() {
 function getFilters() {
     const dateFrom = document.getElementById('dateFrom')?.value;
     const dateTo = document.getElementById('dateTo')?.value;
-    const company = document.getElementById('companyFilter')?.value;
+    const handle = document.getElementById('companyFilter')?.value || null;
     const source = document.getElementById('sourceFilter')?.value;
     
-    let companyId = null;
-    if (company) {
-        const selectedOption = document.getElementById('companyFilter')?.selectedOptions[0];
-        companyId = selectedOption?.dataset.companyId || null;
-    }
-    
-    return { dateFrom, dateTo, company, companyId, source };
+    return { dateFrom, dateTo, handle, source };
 }
 
 async function loadFacebookAds(filters) {
@@ -195,15 +186,15 @@ async function loadFacebookAds(filters) {
         return;
     }
     
-    console.log('[Facebook] Filter range:', filters.dateFrom, 'to', filters.dateTo);
+    console.log('[Facebook] Filter range:', filters.dateFrom, 'to', filters.dateTo, 'handle:', filters.handle);
     
     try {
         let query = supabase
             .from('facebook_ads')
-            .select('*, companies(*)');
+            .select('id, handle, snapshot_date, page_id, page_name, publisher_platform, start_date_string, end_date_string, page_profile_uri, url');
         
-        if (filters.companyId) {
-            query = query.eq('company_id', filters.companyId);
+        if (filters.handle) {
+            query = query.eq('handle', filters.handle);
         }
         
         if (filters.dateFrom) {
@@ -227,9 +218,7 @@ async function loadFacebookAds(filters) {
         
         const safeData = (data || []).map(row => ({
             ...row,
-            ad_image_url: row.ad_image_url ?? null,
-            company_name: row.companies?.name || row.page_name || 'Unknown',
-            company_logo_url: row.companies?.logo_url || null
+            company_name: row.page_name || row.handle || 'Unknown'
         }));
         
         updateTableUI('facebook', safeData);
@@ -246,15 +235,15 @@ async function loadGoogleAds(filters) {
         return;
     }
     
-    console.log('[Google] Filter range:', filters.dateFrom, 'to', filters.dateTo);
+    console.log('[Google] Filter range:', filters.dateFrom, 'to', filters.dateTo, 'handle:', filters.handle);
     
     try {
         let query = supabase
             .from('google_ads')
-            .select('*, companies(*)');
+            .select('id, handle, snapshot_date, advertiser_id, first_shown, last_shown, url, format, image_url');
         
-        if (filters.companyId) {
-            query = query.eq('company_id', filters.companyId);
+        if (filters.handle) {
+            query = query.eq('handle', filters.handle);
         }
         
         if (filters.dateFrom) {
@@ -279,8 +268,7 @@ async function loadGoogleAds(filters) {
         const safeData = (data || []).map(row => ({
             ...row,
             image_url: row.image_url ?? null,
-            company_name: row.companies?.name || row.handle || 'Unknown',
-            company_logo_url: row.companies?.logo_url || null
+            company_name: row.handle || 'Unknown'
         }));
         
         updateTableUI('google', safeData);
@@ -298,15 +286,15 @@ async function loadInstagramPosts(filters) {
         return;
     }
     
-    console.log('[Instagram] Filter range:', filters.dateFrom, 'to', filters.dateTo);
+    console.log('[Instagram] Filter range:', filters.dateFrom, 'to', filters.dateTo, 'handle:', filters.handle);
     
     try {
         let query = supabase
             .from('instagram_posts')
-            .select('*, companies(*)');
+            .select('id, handle, snapshot_date, text, like_count, comment_count, display_uri, url');
         
-        if (filters.companyId) {
-            query = query.eq('company_id', filters.companyId);
+        if (filters.handle) {
+            query = query.eq('handle', filters.handle);
         }
         
         if (filters.dateFrom) {
@@ -331,9 +319,8 @@ async function loadInstagramPosts(filters) {
         const safeData = (data || []).map(row => ({
             ...row,
             display_uri: row.display_uri ?? null,
-            username: row.username ?? '',
-            company_name: row.companies?.name || row.username || 'Unknown',
-            company_logo_url: row.companies?.logo_url || null
+            username: row.handle ?? '',
+            company_name: row.handle || 'Unknown'
         }));
         
         updateTableUI('instagram', safeData);
@@ -385,10 +372,9 @@ function updateTableUI(source, data) {
     }
     
     tbody.innerHTML = data.map(row => {
-        const companyName = row.company_name || row.companies?.name || row[config.companyField] || 'Unknown';
-        const logoUrl = row.company_logo_url || row.companies?.logo_url || null;
+        const companyName = row.company_name || row[config.companyField] || 'Unknown';
         
-        const companyCell = `<td>${renderCompanyWithLogo(companyName, logoUrl, 20)}</td>`;
+        const companyCell = `<td>${renderCompanyName(companyName)}</td>`;
         
         const cells = config.columns.map(col => {
             if (col.key === config.companyField) {
@@ -562,7 +548,7 @@ function updateInstagramChart(data) {
     }
 }
 
-let dashboardCompaniesData = [];
+let dashboardHandles = [];
 
 async function populateCompanyFilter() {
     const companyFilter = document.getElementById('companyFilter');
@@ -570,59 +556,45 @@ async function populateCompanyFilter() {
     if (!companyFilter) return;
     
     try {
-        const { data, error } = await supabase
-            .from('companies')
-            .select('id, company_key, name, logo_url')
-            .order('name', { ascending: true });
+        const [fbResult, googleResult, igResult] = await Promise.all([
+            supabase.from('facebook_ads').select('handle').limit(1000),
+            supabase.from('google_ads').select('handle').limit(1000),
+            supabase.from('instagram_posts').select('handle').limit(1000)
+        ]);
         
-        if (error) {
-            console.error('Error loading companies:', error);
-            return;
-        }
+        const allHandles = new Set();
         
-        dashboardCompaniesData = data || [];
+        (fbResult.data || []).forEach(row => row.handle && allHandles.add(row.handle));
+        (googleResult.data || []).forEach(row => row.handle && allHandles.add(row.handle));
+        (igResult.data || []).forEach(row => row.handle && allHandles.add(row.handle));
+        
+        dashboardHandles = Array.from(allHandles).sort((a, b) => a.localeCompare(b));
         
         const currentValue = companyFilter.value;
         companyFilter.innerHTML = '<option value="">All Companies</option>';
         
-        if (data && data.length > 0) {
-            data.forEach(company => {
-                if (company.id) {
-                    const option = document.createElement('option');
-                    option.value = company.company_key || company.id;
-                    option.textContent = company.name || company.company_key;
-                    option.dataset.companyId = company.id;
-                    option.dataset.logoUrl = company.logo_url || '';
-                    companyFilter.appendChild(option);
-                }
-            });
-        }
+        dashboardHandles.forEach(handle => {
+            const option = document.createElement('option');
+            option.value = handle;
+            option.textContent = handle;
+            companyFilter.appendChild(option);
+        });
         
-        if (currentValue) {
+        if (currentValue && dashboardHandles.includes(currentValue)) {
             companyFilter.value = currentValue;
         }
+        
+        console.log('[Dashboard] Loaded', dashboardHandles.length, 'unique company handles');
         
     } catch (error) {
         console.error('Error populating company filter:', error);
     }
 }
 
-function getCompanyLogo(companyKey) {
-    const company = dashboardCompaniesData.find(c => c.company_key === companyKey);
-    return company?.logo_url || null;
-}
-
-function renderCompanyWithLogo(name, logoUrl, size = 20) {
+function renderCompanyName(name) {
     const displayName = escapeHtml(name || 'Unknown');
-    if (logoUrl) {
-        return `<div class="company-with-logo">
-            <img src="${escapeHtml(logoUrl)}" alt="${displayName}" class="company-logo" style="width: ${size}px; height: ${size}px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-            <div class="company-logo-fallback" style="display: none; width: ${size}px; height: ${size}px;">${displayName.charAt(0).toUpperCase()}</div>
-            <span class="company-name">${displayName}</span>
-        </div>`;
-    }
     return `<div class="company-with-logo">
-        <div class="company-logo-fallback" style="width: ${size}px; height: ${size}px;">${displayName.charAt(0).toUpperCase()}</div>
+        <div class="company-logo-fallback" style="width: 20px; height: 20px;">${displayName.charAt(0).toUpperCase()}</div>
         <span class="company-name">${displayName}</span>
     </div>`;
 }
