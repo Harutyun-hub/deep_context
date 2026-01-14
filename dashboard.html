@@ -195,7 +195,7 @@
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                                 <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/>
                             </svg>
-                            <span>Website</span>
+                            <span>AI Vision</span>
                         </button>
                     </nav>
                     
@@ -542,7 +542,7 @@
                     
                     <div class="pillar-content hidden" id="espionagePillar">
                         <div class="pillar-header">
-                            <h2>Website AI Analysis</h2>
+                            <h2>AI Vision</h2>
                             <p>AI-powered insights into competitor website changes and marketing strategies</p>
                         </div>
                         
@@ -632,6 +632,7 @@
     <script src="auth.js"></script>
     <script src="utils.js"></script>
     <script src="database.js"></script>
+    <script src="intelligenceUtils.js"></script>
     <script src="intelligence.js"></script>
     <script>
         const collapseBtn = document.getElementById('collapseBtn');
@@ -691,45 +692,25 @@
             await signOut();
         });
         
-        // Live Threat Telemetry - runs after a brief delay to ensure Supabase is ready
+        // Live Threat Telemetry - uses shared intelligenceUtils for consistent scoring
         setTimeout(async function loadThreatTelemetry() {
             try {
-                const supabase = await SupabaseManager.getClient();
+                // Ensure Supabase is ready before calculating threat level
+                await SupabaseManager.initialize();
                 
-                // Try to get aggression score from intelligence_scores view first
-                const { data: scoreData, error: scoreError } = await supabase
-                    .from('intelligence_scores')
-                    .select('aggression_score')
-                    .limit(1)
-                    .single();
+                // Use shared calculation from intelligenceUtils.js
+                const threatData = await IntelligenceUtils.calculateThreatLevel();
+                const aggressionScore = threatData.score;
                 
-                let aggressionScore = 0;
-                
-                if (!scoreError && scoreData?.aggression_score) {
-                    aggressionScore = parseInt(scoreData.aggression_score) || 0;
-                } else {
-                    // Fallback: count recent website_data entries (activity density)
-                    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-                    const { count, error: countError } = await supabase
-                        .from('website_data')
-                        .select('*', { count: 'exact', head: true })
-                        .gte('scanned_at', twentyFourHoursAgo);
-                    
-                    if (!countError && count !== null) {
-                        aggressionScore = Math.min(100, Math.round((count / 50) * 100));
-                    }
-                }
-                
-                // Determine threat level with stricter thresholds
+                // Map status to threat level for CSS classes
                 let threatLevel = 'low';
-                let stateText = 'Low 🟢 · ' + aggressionScore + '%';
-                if (aggressionScore > 65) {
+                if (threatData.status === 'CRITICAL') {
                     threatLevel = 'high';
-                    stateText = 'HIGH 🔥 · ' + aggressionScore + '%';
-                } else if (aggressionScore >= 30) {
+                } else if (threatData.status === 'ELEVATED') {
                     threatLevel = 'medium';
-                    stateText = 'Moderate 👀 · ' + aggressionScore + '%';
                 }
+                
+                const stateText = threatData.label + ' · ' + aggressionScore + '%';
                 
                 // Update War Room button glow
                 const warRoomBtn = document.getElementById('warRoomNavBtn');
@@ -758,7 +739,7 @@
                     hudEl.style.display = 'flex';
                 }
                 
-                console.log('✓ Threat telemetry loaded:', { aggressionScore, threatLevel });
+                console.log('✓ Threat telemetry loaded:', { aggressionScore, threatLevel, status: threatData.status });
                 
             } catch (error) {
                 console.warn('Threat telemetry failed (non-blocking):', error.message);
