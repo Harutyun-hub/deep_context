@@ -853,8 +853,8 @@ function updateInstagramTrend() {
     const dateEngagement = {};
     
     allData.instagramPosts.forEach(post => {
-        if (post.created_at) {
-            const date = post.created_at.split('T')[0];
+        if (post.snapshot_date) {
+            const date = post.snapshot_date.split('T')[0];
             if (!dateEngagement[date]) dateEngagement[date] = { likes: 0, comments: 0 };
             dateEngagement[date].likes += post.like_count || 0;
             dateEngagement[date].comments += post.comment_count || 0;
