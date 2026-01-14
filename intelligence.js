@@ -570,7 +570,7 @@ async function loadScreenshots(filters) {
     try {
         let query = supabase
             .from('company_screenshots')
-            .select('id, image_url, page_type, created_at, company_name, company_id');
+            .select('id, image_url, page_type, created_at, company_name, company_id, marketing_intent, ai_analysis, promotions_detected');
         
         const companyIds = getCompanyIdsFromFilters(filters);
         if (companyIds.length > 0) {
@@ -1660,37 +1660,228 @@ function updateDiffViewer(companyName) {
     container.innerHTML = html;
 }
 
+let aiViewerScreenshots = [];
+
 function updateScreenshotsGrid() {
-    const container = document.getElementById('screenshotsGrid');
+    populateAiViewerCompanySelect();
+}
+
+function populateAiViewerCompanySelect() {
+    const select = document.getElementById('aiViewerCompanySelect');
+    if (!select) return;
+    
+    const companiesWithScreenshots = new Set();
+    allData.screenshots.forEach(ss => {
+        if (ss.company_name && ss.company_id) {
+            companiesWithScreenshots.add(JSON.stringify({ id: ss.company_id, name: ss.company_name }));
+        }
+    });
+    
+    select.innerHTML = '<option value="">Select Company</option>';
+    Array.from(companiesWithScreenshots)
+        .map(s => JSON.parse(s))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach(company => {
+            const option = document.createElement('option');
+            option.value = company.id;
+            option.textContent = company.name;
+            select.appendChild(option);
+        });
+    
+    select.removeEventListener('change', handleAiViewerCompanyChange);
+    select.addEventListener('change', handleAiViewerCompanyChange);
+}
+
+async function handleAiViewerCompanyChange(e) {
+    const companyId = e.target.value;
+    await loadAiViewerScreenshots(companyId);
+}
+
+async function loadAiViewerScreenshots(companyId) {
+    const container = document.getElementById('aiViewerContent');
     if (!container) return;
     
-    const screenshots = allData.screenshots.slice(0, 12);
-    
-    if (screenshots.length === 0) {
+    if (!companyId) {
         container.innerHTML = `
-            <div class="empty-state">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/>
-                </svg>
-                <h4>No screenshots available</h4>
-                <p>Website screenshots will appear here when captured</p>
+            <div class="ai-viewer-empty-state">
+                <div class="empty-icon-glow">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                        <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h4>Select a Company to View AI Analysis</h4>
+                <p>Choose a competitor to explore their website screenshots with AI-powered insights</p>
             </div>
         `;
         return;
     }
     
-    container.innerHTML = screenshots.map(ss => `
-        <div class="screenshot-card">
-            <img class="screenshot-image" src="${escapeHtml(ss.image_url || '')}" alt="${escapeHtml(ss.company_name || 'Screenshot')}" onclick="openImageModal('${escapeHtml(ss.image_url || '')}')" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 300 200%22><rect fill=%22%23f3f4f6%22 width=%22300%22 height=%22200%22/><text fill=%22%239ca3af%22 x=%22150%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22>No image</text></svg>'">
-            <div class="screenshot-info">
-                <div class="screenshot-company">${escapeHtml(ss.company_name || 'Unknown')}</div>
-                <div class="screenshot-meta">
-                    <span class="screenshot-type">${escapeHtml(ss.page_type || 'Homepage')}</span>
-                    <span class="screenshot-date">${ss.created_at ? formatDate(ss.created_at) : 'N/A'}</span>
+    container.innerHTML = `
+        <div class="ai-viewer-loading">
+            <div class="loading-spinner"><img src="attached_assets/Deep_context_logo_small_1767380144359.png" alt="Loading"></div>
+            <span>Loading AI analysis...</span>
+        </div>
+    `;
+    
+    try {
+        const { data, error } = await supabase
+            .from('company_screenshots')
+            .select('id, image_url, page_type, created_at, company_name, company_id, marketing_intent, ai_analysis, promotions_detected')
+            .eq('company_id', companyId)
+            .order('created_at', { ascending: true });
+        
+        if (error) {
+            console.error('Error loading AI viewer screenshots:', error);
+            container.innerHTML = `
+                <div class="ai-no-screenshots">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                    </svg>
+                    <h4>Error loading screenshots</h4>
+                    <p>Please try again later</p>
+                </div>
+            `;
+            return;
+        }
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = `
+                <div class="ai-no-screenshots">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                        <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/>
+                    </svg>
+                    <h4>No Screenshots Available</h4>
+                    <p>No website screenshots have been captured for this company yet</p>
+                </div>
+            `;
+            return;
+        }
+        
+        aiViewerScreenshots = data;
+        const latestIndex = aiViewerScreenshots.length - 1;
+        renderAiViewer(latestIndex);
+        
+    } catch (error) {
+        console.error('Error loading AI viewer screenshots:', error);
+        container.innerHTML = `
+            <div class="ai-no-screenshots">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                </svg>
+                <h4>Error loading screenshots</h4>
+                <p>Please try again later</p>
+            </div>
+        `;
+    }
+}
+
+function renderAiViewer(currentIndex) {
+    const container = document.getElementById('aiViewerContent');
+    if (!container || aiViewerScreenshots.length === 0) return;
+    
+    const screenshot = aiViewerScreenshots[currentIndex];
+    const latestIndex = aiViewerScreenshots.length - 1;
+    
+    const dateStr = screenshot.created_at 
+        ? new Date(screenshot.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'Unknown Date';
+    
+    const pageType = screenshot.page_type || 'Homepage';
+    const marketingIntent = screenshot.marketing_intent || 'No marketing analysis available';
+    const aiAnalysis = screenshot.ai_analysis || 'AI analysis pending...';
+    const hasPromo = screenshot.promotions_detected === true || screenshot.promotions_detected === 'true';
+    
+    const companyData = allData.companies.find(c => c.id === screenshot.company_id);
+    const websiteUrl = companyData?.website_url || null;
+    
+    container.innerHTML = `
+        <div class="ai-hero-container">
+            <div class="ai-screenshot-frame">
+                <div class="ai-screenshot-inner">
+                    <img id="aiHeroImage" class="ai-hero-image" src="${escapeHtml(screenshot.image_url || '')}" alt="Website Screenshot" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 800 500%22><rect fill=%22%23f3f4f6%22 width=%22800%22 height=%22500%22/><text fill=%22%239ca3af%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2220%22>Image unavailable</text></svg>'">
+                    <div class="ai-page-type-badge">${escapeHtml(pageType)}</div>
+                    <div class="ai-date-badge" id="aiDateBadge">${escapeHtml(dateStr)}</div>
                 </div>
             </div>
+            
+            <div class="ai-time-scrubber">
+                <input type="range" id="aiTimeSlider" class="ai-slider" min="0" max="${latestIndex}" value="${currentIndex}" step="1">
+                <div class="ai-slider-labels">
+                    <span class="ai-slider-label oldest">Oldest</span>
+                    <span class="ai-slider-label newest">Newest</span>
+                </div>
+            </div>
+            
+            <div class="ai-insight-panel" id="aiInsightPanel">
+                <div class="ai-insight-header">
+                    <div class="ai-insight-icon">🤖</div>
+                    <span class="ai-insight-label">AI Vision Analysis</span>
+                    <div class="ai-insight-pulse"></div>
+                </div>
+                ${hasPromo ? `
+                    <div class="ai-promo-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                        Promotions Detected
+                    </div>
+                ` : ''}
+                <div class="ai-insight-headline" id="aiInsightHeadline">${escapeHtml(marketingIntent)}</div>
+                <div class="ai-insight-description" id="aiInsightDescription">${escapeHtml(aiAnalysis.replace(/^"|"$/g, ''))}</div>
+                ${websiteUrl ? `
+                    <a href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer" class="ai-visit-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                        Visit Website
+                    </a>
+                ` : ''}
+            </div>
         </div>
-    `).join('');
+    `;
+    
+    initAiTimeSlider();
+}
+
+function initAiTimeSlider() {
+    const slider = document.getElementById('aiTimeSlider');
+    if (!slider) return;
+    
+    slider.addEventListener('input', (e) => {
+        const index = parseInt(e.target.value, 10);
+        updateAiViewerDisplay(index);
+    });
+}
+
+function updateAiViewerDisplay(index) {
+    if (index < 0 || index >= aiViewerScreenshots.length) return;
+    
+    const screenshot = aiViewerScreenshots[index];
+    
+    const image = document.getElementById('aiHeroImage');
+    const dateBadge = document.getElementById('aiDateBadge');
+    const headline = document.getElementById('aiInsightHeadline');
+    const description = document.getElementById('aiInsightDescription');
+    
+    if (image) {
+        image.src = screenshot.image_url || '';
+    }
+    
+    if (dateBadge) {
+        const dateStr = screenshot.created_at 
+            ? new Date(screenshot.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'Unknown Date';
+        dateBadge.textContent = dateStr;
+    }
+    
+    if (headline) {
+        headline.textContent = screenshot.marketing_intent || 'No marketing analysis available';
+    }
+    
+    if (description) {
+        const aiText = screenshot.ai_analysis || 'AI analysis pending...';
+        description.textContent = aiText.replace(/^"|"$/g, '');
+    }
 }
 
 function updateChangesTimeline() {

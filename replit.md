@@ -21,7 +21,7 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Layout**: Collapsible left sidebar for navigation, main chat area with AI Assistant header, message list, and fixed input bar.
 - **Message Display**: Glass bubble messages with avatars; user messages on the right (50% opacity), AI messages on the left (40% opacity).
 - **Dashboard Design**: Glass filter section, blue table headers, collapsible content sections.
-- **Competitive Intelligence Suite**: 4-pillar tabbed navigation for Battlefield Overview, Pulse of Engagement, Creative Strategy, and Website Espionage.
+- **Competitive Intelligence Suite**: 4-pillar tabbed navigation for Battlefield Overview, Pulse of Engagement, Creative Strategy, and Website (AI Analysis).
 - **War Room Design**: "Neon Glass" dark cyberpunk aesthetic with deep slate background, neon accents, Inter and JetBrains Mono typography, DEFCON module, Aggression Gauge, Ticker Tape, Mission Control dropdowns with neon glow effects, and bi-directional Battlefield timeline chart.
 
 ### Technical Implementations
@@ -54,6 +54,7 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **War Room**: Tactical Command Center displaying DEFCON threat levels, aggression gauge, live competitor activity ticker, Mission Control for company vs. competitor selection (TotoGaming Protocol default), and "Stacked Frontline" Battlefield chart showing 30-day marketing activity timeline with 4 datasets (Paid vs Organic for both sides) and Live Intel Feed sidebar displaying actual competitor creatives on hover.
 - **Live Threat Telemetry**: Real-time "COMPETITOR ACTIVITY" badge in header (black glassmorphism design matching login page, absolute center positioned). Uses shared `intelligenceUtils.js` for consistent weighted scoring across all pages. Data sourced from `intel_events` table (last 24 hours) with weighted calculation: HIGH severity = 25 points, MEDIUM = 8 points, LOW = 2 points, default = 5 points. Score capped at 100. UI Thresholds: Score 0-30 = "SECURE" / "Low 🟢" (green), Score 31-70 = "ELEVATED" / "Moderate 👀" (yellow), Score 71-100 = "CRITICAL" / "HIGH 🔥" (red pulse). War Room sidebar button pulses red (critical) or glows yellow (elevated).
 - **AI Vision Analysis**: Visual Intercept section displays AI-analyzed screenshots with "AI Tactical Insight" panel showing marketing intent headline and AI analysis subtext when `promotions_detected=true` or `ai_analysis` exists.
+- **Website AI Analysis Tab**: Glassmorphism-styled screenshot viewer in the Competitive Intelligence Suite. Features: (1) Company dropdown selector to choose competitor, (2) Hero screenshot with glassmorphism frame and gradient borders, (3) Time slider scrubber for scrolling through screenshot history (oldest to newest), (4) AI Insight Panel with marketing intent headline, AI analysis description, promotions detected badge, and visit website link. Uses `company_screenshots` table with `marketing_intent`, `ai_analysis`, and `promotions_detected` columns. CSS includes animated glows, frosted glass effects, and smooth transitions.
 
 ## External Dependencies
 - **Supabase**: User authentication (Google OAuth), PostgreSQL database, and Row Level Security.
