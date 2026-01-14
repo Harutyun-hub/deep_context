@@ -1,0 +1,132 @@
+Facebook_ads
+
+create table public.facebook_ads (
+  id bigint generated always as identity not null,
+  created_at timestamp with time zone null default now(),
+  handle text null,
+  snapshot_date timestamp with time zone null,
+  page_id text null,
+  page_name text null,
+  publisher_platform text null,
+  start_date_string text null,
+  end_date_string text null,
+  page_profile_uri text null,
+  url text null,
+  snapshot_data jsonb null,
+  ad_text text null,
+  ad_image_url text null,
+  ad_cta_type text null,
+  ad_link_url text null,
+  ad_display_format text null,
+  vectorized_at timestamp with time zone null,
+  company_id uuid not null,
+  intel_processed boolean null default false,
+  constraint facebook_ads_pkey primary key (id),
+  constraint facebook_ads_url_snapshot_date_key unique (url, snapshot_date),
+  constraint facebook_ads_company_id_fkey foreign KEY (company_id) references companies (id)
+) TABLESPACE pg_default;
+
+
+Google_ads
+
+create table public.google_ads (
+  id bigint generated always as identity not null,
+  created_at timestamp with time zone null default now(),
+  handle text null,
+  snapshot_date timestamp with time zone null,
+  advertiser_id text null,
+  first_shown timestamp with time zone null,
+  last_shown timestamp with time zone null,
+  url text not null,
+  format text null,
+  image_url text null,
+  creative_regions jsonb null,
+  region_code text null,
+  region_name text null,
+  company_id uuid not null,
+  intel_processed boolean null default false,
+  constraint google_ads_pkey primary key (id),
+  constraint google_ads_url_snapshot_date_key unique (url, snapshot_date),
+  constraint google_ads_company_id_fkey foreign KEY (company_id) references companies (id)
+) TABLESPACE pg_default;
+
+
+Instagram_posts
+
+create table public.instagram_posts (
+  id bigint generated always as identity not null,
+  created_at timestamp with time zone null default now(),
+  handle text null,
+  snapshot_date timestamp with time zone null,
+  text text null,
+  username text null,
+  profile_pic_url text null,
+  comment_count integer null,
+  like_count integer null,
+  display_uri text null,
+  url text null,
+  vectorized_at timestamp with time zone null,
+  company_id uuid not null,
+  intel_processed boolean null default false,
+  constraint instagram_posts_pkey primary key (id),
+  constraint instagram_posts_url_snapshot_date_key unique (url, snapshot_date),
+  constraint instagram_posts_company_id_fkey foreign KEY (company_id) references companies (id)
+) TABLESPACE pg_default;
+
+company_screenshots
+
+create table public.company_screenshots (
+  id uuid not null default gen_random_uuid (),
+  company_id uuid null,
+  image_url text not null,
+  page_type text null default 'homepage'::text,
+  created_at timestamp with time zone null default now(),
+  company_name text null,
+  marketing_intent text null,
+  promotions_detected boolean null default false,
+  ai_analysis jsonb null,
+  vectorized_at timestamp with time zone null,
+  intel_processed boolean null default false,
+  handle text null,
+  constraint company_screenshots_pkey primary key (id),
+  constraint uq_company_screenshots_image_url unique (image_url),
+  constraint company_screenshots_company_id_fkey foreign KEY (company_id) references companies (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists idx_screenshots_created_at on public.company_screenshots using btree (created_at desc) TABLESPACE pg_default;
+
+Website_data
+
+create table public.website_data (
+  id bigserial not null,
+  created_at timestamp with time zone not null default now(),
+  company_id uuid null,
+  company_name text null,
+  handle text not null,
+  snapshot_date timestamp with time zone not null,
+  url text not null,
+  title text null,
+  meta_description text null,
+  meta_keywords text null,
+  og_title text null,
+  og_description text null,
+  og_url text null,
+  html_raw text not null,
+  content_text text null,
+  vectorized_at timestamp with time zone null,
+  tech_stack jsonb null default '{}'::jsonb,
+  active_promotions jsonb null default '{}'::jsonb,
+  constraint website_data_pkey primary key (id),
+  constraint website_data_company_id_fkey foreign KEY (company_id) references companies (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists website_data_company_date_idx on public.website_data using btree (company_id, snapshot_date) TABLESPACE pg_default;
+
+create trigger trigger_calc_promotions BEFORE INSERT
+or
+update on website_data for EACH row
+execute FUNCTION auto_extract_promotions ();
+
+create trigger trigger_link_company_url BEFORE INSERT on website_data for EACH row
+execute FUNCTION link_company_by_url ();
+
