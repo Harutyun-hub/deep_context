@@ -5,8 +5,10 @@ import os
 import json
 import sys
 import signal
+import urllib.request
+import urllib.error
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, unquote
 
 PORT = 5000
 
@@ -71,9 +73,13 @@ window.__SUPABASE_CONFIG__ = {{
 class ProductionHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """Production-grade HTTP request handler with proper error handling."""
     
+    _skip_default_cache_headers = False
+    
     def end_headers(self):
-        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
-        self.send_header('Expires', '0')
+        if not self._skip_default_cache_headers:
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            self.send_header('Expires', '0')
+        self._skip_default_cache_headers = False
         super().end_headers()
     
     def guess_type(self, path):
@@ -106,6 +112,8 @@ class ProductionHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             
             if path == '/api/config':
                 self._handle_api_config()
+            elif path == '/api/proxy-image':
+                self._handle_proxy_image(parsed_path.query)
             elif path.endswith('.html') or path == '/' or path == '':
                 self._handle_html_with_config(path)
             else:
@@ -165,6 +173,67 @@ class ProductionHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             log_error(f"Error in /api/config: {str(e)}")
             raise
+    
+    def _handle_proxy_image(self, query_string):
+        """Proxy external images (Instagram CDN) to bypass hotlink protection."""
+        image_url = None
+        try:
+            params = parse_qs(query_string)
+            image_url = params.get('url', [None])[0]
+            
+            if not image_url:
+                self._send_error_response(400, "Missing 'url' parameter")
+                return
+            
+            image_url = unquote(image_url)
+            
+            parsed_url = urlparse(image_url)
+            hostname = parsed_url.hostname or ''
+            
+            if parsed_url.scheme != 'https':
+                self._send_error_response(403, "Only HTTPS URLs allowed")
+                return
+            
+            allowed_suffixes = ('.cdninstagram.com', '.instagram.com')
+            allowed_exact = ('cdninstagram.com', 'instagram.com')
+            is_allowed = hostname in allowed_exact or hostname.endswith(allowed_suffixes)
+            
+            if not is_allowed:
+                self._send_error_response(403, "Domain not allowed")
+                return
+            
+            req = urllib.request.Request(
+                image_url,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Referer': '',
+                }
+            )
+            
+            with urllib.request.urlopen(req, timeout=10) as response:
+                image_data = response.read()
+                content_type = response.headers.get('Content-Type', 'image/jpeg')
+            
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(image_data)))
+            self.send_header('Cache-Control', 'public, max-age=86400')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self._skip_default_cache_headers = True
+            self.end_headers()
+            self.wfile.write(image_data)
+            
+        except urllib.error.HTTPError as e:
+            log_error(f"HTTP error fetching image: {e.code} - {image_url}")
+            self._send_error_response(e.code, f"Image fetch failed: {e.reason}")
+        except urllib.error.URLError as e:
+            log_error(f"URL error fetching image: {str(e)} - {image_url}")
+            self._send_error_response(502, "Failed to fetch image")
+        except Exception as e:
+            log_error(f"Error proxying image: {str(e)}")
+            self._send_error_response(500, "Internal proxy error")
     
     def _send_error_response(self, status_code, message):
         """Send a proper error response."""
