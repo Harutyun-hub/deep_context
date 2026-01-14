@@ -263,7 +263,7 @@ async function loadInstagramPosts(filters) {
     try {
         let query = supabase
             .from('instagram_posts')
-            .select('id, username, profile_pic_url, text, like_count, comment_count, display_uri, url, created_at, company_id');
+            .select('id, username, profile_pic_url, text, like_count, comment_count, display_uri, url, created_at, company_id, snapshot_date');
         
         const companyIds = getCompanyIdsFromFilters(filters);
         if (companyIds.length > 0) {
@@ -296,7 +296,7 @@ async function loadFacebookAds(filters) {
     try {
         let query = supabase
             .from('facebook_ads')
-            .select('id, page_name, ad_image_url, ad_text, ad_cta_type, ad_display_format, ad_link_url, start_date_string, end_date_string, company_id');
+            .select('id, page_name, ad_image_url, ad_text, ad_cta_type, ad_display_format, ad_link_url, start_date_string, end_date_string, company_id, snapshot_date');
         
         const companyIds = getCompanyIdsFromFilters(filters);
         if (companyIds.length > 0) {
@@ -329,7 +329,7 @@ async function loadGoogleAds(filters) {
     try {
         let query = supabase
             .from('google_ads')
-            .select('id, image_url, url, format, first_shown, last_shown, region_name, company_id');
+            .select('id, image_url, url, format, first_shown, last_shown, region_name, company_id, snapshot_date');
         
         const companyIds = getCompanyIdsFromFilters(filters);
         if (companyIds.length > 0) {
@@ -753,24 +753,24 @@ function updateActivityTimeline() {
     const dateGroups = {};
     
     allData.instagramPosts.forEach(post => {
-        if (post.created_at) {
-            const date = post.created_at.split('T')[0];
+        if (post.snapshot_date) {
+            const date = post.snapshot_date.split('T')[0];
             if (!dateGroups[date]) dateGroups[date] = { posts: 0, fbAds: 0, gAds: 0 };
             dateGroups[date].posts++;
         }
     });
     
     allData.facebookAds.forEach(ad => {
-        if (ad.start_date_string) {
-            const date = ad.start_date_string.split('T')[0];
+        if (ad.snapshot_date) {
+            const date = ad.snapshot_date.split('T')[0];
             if (!dateGroups[date]) dateGroups[date] = { posts: 0, fbAds: 0, gAds: 0 };
             dateGroups[date].fbAds++;
         }
     });
     
     allData.googleAds.forEach(ad => {
-        if (ad.first_shown) {
-            const date = ad.first_shown.split('T')[0];
+        if (ad.snapshot_date) {
+            const date = ad.snapshot_date.split('T')[0];
             if (!dateGroups[date]) dateGroups[date] = { posts: 0, fbAds: 0, gAds: 0 };
             dateGroups[date].gAds++;
         }
