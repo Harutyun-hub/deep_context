@@ -1162,7 +1162,7 @@ async function getAIResponse(userMessage, sessionId, userId) {
                 });
                 
                 // Race between fetch and timeout
-                const webhookUrl = window.SUPABASE_CONFIG?.n8nWebhook || 'https://wimedia.app.n8n.cloud/webhook/4c244caf-d1ff-42a1-82a2-917a51b2ca77';
+                const webhookUrl = window.__SUPABASE_CONFIG__?.n8nWebhook || 'https://wimedia.app.n8n.cloud/webhook/4c244caf-d1ff-42a1-82a2-917a51b2ca77';
                 const fetchPromise = fetch(webhookUrl, {
                     method: 'POST',
                     headers: {
