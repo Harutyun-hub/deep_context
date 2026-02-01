@@ -57,8 +57,13 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **AI Vision Analysis**: Visual Intercept section displays AI-analyzed screenshots with "AI Tactical Insight" panel showing marketing intent headline and AI analysis subtext when `promotions_detected=true` or `ai_analysis` exists.
 - **Website AI Analysis Tab**: Glassmorphism-styled screenshot viewer in the Competitive Intelligence Suite. Features: (1) Company dropdown selector to choose competitor, (2) Hero screenshot with glassmorphism frame and gradient borders, (3) Time slider scrubber for scrolling through screenshot history (oldest to newest), (4) AI Insight Panel with marketing intent headline, AI analysis description, promotions detected badge, and visit website link. Uses `company_screenshots` table with `marketing_intent`, `ai_analysis`, and `promotions_detected` columns. CSS includes animated glows, frosted glass effects, and smooth transitions.
 
+- **Graph Dashboard**: React-based interactive force-directed graph visualization at `frontend/`. Uses `react-force-graph-2d` to display Neo4j graph data from `/api/graph`. Features neon glow nodes with custom canvas rendering (`nodeCanvasObject` with `ctx.shadowBlur`), color-coded node groups (Ad, Platform, Campaign, AdSet, Creative, Account), curved links with directional particles, click-to-zoom navigation, and glassmorphism UI panels (header showing node/connection counts, legend). Dark cyberpunk aesthetic with gradient background.
+
 ## External Dependencies
 - **Supabase**: User authentication (Google OAuth), PostgreSQL database, and Row Level Security.
 - **n8n**: AI backend for contextual responses and Redis for AI conversation memory.
+- **Neo4j**: Graph database for relationship data, served via Express API at `/api/graph`.
+- **React + Vite**: Modern React frontend in `frontend/` directory with HMR and API proxy.
+- **react-force-graph-2d**: Force-directed graph visualization library for interactive node-link diagrams.
 - **Chart.js 4.4.1**: Interactive charts for AI responses and the analytics dashboard.
 - **Typography**: Space Grotesk (variable font, locally hosted) for login page; Inter and JetBrains Mono via Google Fonts for other pages.
