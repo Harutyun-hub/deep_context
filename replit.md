@@ -58,15 +58,14 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Website AI Analysis Tab**: Glassmorphism-styled screenshot viewer in the Competitive Intelligence Suite. Features: (1) Company dropdown selector to choose competitor, (2) Hero screenshot with glassmorphism frame and gradient borders, (3) Time slider scrubber for scrolling through screenshot history (oldest to newest), (4) AI Insight Panel with marketing intent headline, AI analysis description, promotions detected badge, and visit website link. Uses `company_screenshots` table with `marketing_intent`, `ai_analysis`, and `promotions_detected` columns. CSS includes animated glows, frosted glass effects, and smooth transitions.
 
 - **Strategic Map (Graph Dashboard)**: React-based interactive force-directed graph visualization at `frontend/`. Uses `react-force-graph-2d` to display Neo4j graph data from `/api/graph`. Features:
-  - **Enterprise Graph Schema**: Supports new Neo4j schema with `(:Brand)-[:PUBLISHED {platform}]->(:Ad)-[:COVERS_TOPIC {context}]->(:Topic)` structure
-  - **Three-Query Backend Architecture**: Separate optimized Cypher queries for brands (all brands including disconnected), topics (aggregated contexts/evidence using COLLECT DISTINCT), and links (per brand-topic-platform with ad counts)
+  - **Executive Strategy View**: Optimized aggregation query that compresses 2000+ Ad nodes into ~100 node lightweight Brand-Topic strategy map
+  - **Single-Record Aggregation Query**: Backend aggregates ads into weights, limits to top 80 topics by global volume, returns pre-calculated nodes with id/group/label/radius/color
   - **War Room Card Container**: Professional rounded-2xl card with subtle shadow, glassmorphism header showing entity/connection counts, and inline legend (Brands/Topics)
   - **Deep Space Blue Canvas (#0f172a)**: Dark background that makes data pop
-  - **Neon Intelligence Palette**: Brands (Neon Blue #3b82f6 with 15px glow), Topics (Neon Purple #a855f7)
-  - **Platform-Based Link Coloring**: Links colored by platform - Instagram (Pink #ec4899), Facebook (Blue #3b82f6), Website (Green #22c55e), with legend in header
-  - **Strategic Visuals**: Link thickness using `sqrt(link.value)+1` formula (thick = core strategy, thin = occasional mentions); Node sizing with Brands=20 (massive anchors), Topics sized by `sqrt(weight)*3+4`
+  - **Neon Intelligence Palette**: Brands (Neon Blue #3b82f6 with 15px glow, fixed 30px radius), Topics (Neon Purple #a855f7, dynamic radius based on log(market volume))
+  - **Weight-Based Link Styling**: Gray links (#94a3b8) with thickness based on ad volume between brand and topic (sqrt(value)+1 formula)
   - **Physics Engine**: Strong repulsion (`charge.strength(-400)`) and longer link distance (120px) for readability
-  - **Click-Triggered Side Panel**: When clicking a Topic node, displays Rich Context (strategic explanation from COVERS_TOPIC.context) and Supporting Evidence (ad snippets with platform, date, and links). Brand nodes show industry and connection count.
+  - **Click-Triggered Side Panel**: Topic nodes show market volume note and connection count. Brand nodes show industry and connection count.
   - **Interactivity**: Hover highlighting (dims non-connected nodes to 15% opacity, shows tooltip with entity name/type/connections), click-to-zoom (centers and zooms to 2.5x with side panel), background click resets highlights and closes panel
   - **Tailwind CSS**: Configured with `@tailwindcss/postcss` for styling
 
