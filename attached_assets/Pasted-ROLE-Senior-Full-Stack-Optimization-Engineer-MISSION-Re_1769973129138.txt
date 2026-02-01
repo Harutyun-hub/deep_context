@@ -1,0 +1,61 @@
+ROLE: Senior Full Stack Optimization Engineer
+MISSION: Refactor the Graph Dashboard to solve the "Slow/Heavy" performance issue and switch to an "Executive Strategy View".
+
+DIAGNOSIS:
+1. Performance: The current app loads all "Ad" nodes (2000+), causing the browser to freeze due to heavy physics calculations.
+2. UX: The graph is a "hairball" of raw data. Executives need a clean map of "Brand vs. Topic" strategy.
+
+SOLUTION:
+We will "virtualize" the graph. We will stop sending raw Ad nodes to the frontend. Instead, the Backend will aggregate the data and return a lightweight map (~100 nodes max) of Brands and their Top Topics.
+
+SAFETY RULES:
+1. READ-ONLY: Do NOT write any Cypher that modifies the database (No CREATE, SET, DELETE).
+2. SCHEMA: Do not change the database structure. We are only changing the *Query* and the *Frontend Rendering*.
+
+---
+
+### TASK 1: Optimize Backend (`server.js`)
+Replace the Cypher query in your `/api/graph` endpoint with this **Single-Record Aggregation Query**. 
+This query compresses thousands of ads into a single, clean JSON object representing the market strategy.
+
+```cypher
+// 1. MATCH: Traverse the full path but keep data server-side
+MATCH (b:Brand)-[:PUBLISHED]->(a:Ad)-[:COVERS_TOPIC]->(t:Topic)
+
+// 2. AGGREGATE: Collapse Ads into weights
+WITH b, t, count(a) AS weight
+WHERE weight >= 1 
+
+// 3. RANKING: Calculate Global Topic Volume to find the "Market Leaders"
+WITH t, sum(weight) AS topicGlobalVol, collect({source: elementId(b), target: elementId(t), value: weight}) AS brandLinks
+ORDER BY topicGlobalVol DESC
+LIMIT 80 // <--- HARD LIMIT: Keeps the graph instant and lightweight
+
+// 4. FORMATTING: Build the node lists
+WITH collect(t) AS topics, collect(brandLinks) AS linkGroups
+WITH topics, [link IN reduce(acc=[], g IN linkGroups | acc + g) | link] AS allLinks
+
+// 5. CLEANUP: Get only the Brands involved in these top topics
+UNWIND allLinks AS l
+MATCH (b:Brand) WHERE elementId(b) = l.source
+WITH topics, allLinks, collect(DISTINCT b) AS brands
+
+// 6. RETURN: A single, pre-calculated JSON object for React
+RETURN {
+  nodes: 
+    [brand IN brands | {
+      id: elementId(brand), 
+      group: 'Brand', 
+      label: brand.name, 
+      radius: 30,         // Fixed large size for Brands
+      color: '#3b82f6'    // Brand Blue
+    }] + 
+    [topic IN topics | {
+      id: elementId(topic), 
+      group: 'Topic', 
+      label: topic.name, 
+      radius: 5 + (log(topicGlobalVol) * 5), // Dynamic size based on market volume
+      color: '#a855f7'    // Topic Purple
+    }],
+  links: allLinks
+} AS graphData
