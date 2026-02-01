@@ -1,0 +1,14 @@
+{
+  "name": "replit-github-push",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "push": "node push-to-github.js"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.0",
+    "@supabase/supabase-js": "^2.89.0",
+    "http-server": "^14.1.1",
+    "neo4j-driver": "^6.0.1"
+  }
+}
