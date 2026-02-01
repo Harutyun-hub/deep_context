@@ -84,10 +84,10 @@ function GraphDashboard() {
   }, [graphData]);
 
   const getNodeSize = useCallback((node) => {
-    const nodeType = node.label || node.group;
-    if (nodeType === 'Brand') return 20;
-    const weight = node.weight || node.degree || 1;
-    return Math.sqrt(weight) * 3 + 4;
+    if (node.radius) return node.radius;
+    const nodeType = node.group;
+    if (nodeType === 'Brand') return 30;
+    return 10;
   }, []);
 
   const handleNodeHover = useCallback((node) => {
@@ -124,10 +124,10 @@ function GraphDashboard() {
   }, []);
 
   const nodeCanvasObject = useCallback((node, ctx, globalScale) => {
-    const label = node.name || node.caption || node.id;
+    const label = node.label || node.name || node.caption || node.id;
     const nodeSize = getNodeSize(node);
-    const nodeType = node.label || node.group;
-    const color = getNodeColor(nodeType);
+    const nodeType = node.group;
+    const color = node.color || getNodeColor(nodeType);
     const fontSize = Math.max(10 / globalScale, 2);
     
     const isHighlighted = highlightNodes.size === 0 || highlightNodes.has(node.id);
@@ -136,7 +136,7 @@ function GraphDashboard() {
     
     ctx.save();
     
-    if (nodeType === 'Brand' || isSelected) {
+    if (node.group === 'Brand' || isSelected) {
       ctx.shadowBlur = isSelected ? 25 : 15;
       ctx.shadowColor = isSelected ? '#ffffff' : color;
     }
@@ -181,8 +181,7 @@ function GraphDashboard() {
   }, [getNodeSize]);
 
   const getLinkColor = useCallback((link) => {
-    const platform = link.platform;
-    const baseColor = getPlatformColor(platform);
+    const baseColor = '#94a3b8';
     
     if (highlightNodes.size === 0) {
       return baseColor + '4D';
@@ -268,19 +267,7 @@ function GraphDashboard() {
           </div>
         </div>
         <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-          <span>Links:</span>
-          <div className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5" style={{ backgroundColor: PLATFORM_COLORS.Instagram }}></span>
-            <span>Instagram</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5" style={{ backgroundColor: PLATFORM_COLORS.Facebook }}></span>
-            <span>Facebook</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5" style={{ backgroundColor: PLATFORM_COLORS.Website }}></span>
-            <span>Website</span>
-          </div>
+          <span>Link thickness shows ad volume between brand and topic</span>
         </div>
       </div>
       
@@ -290,20 +277,20 @@ function GraphDashboard() {
             className="absolute top-4 left-4 z-10 px-4 py-3 rounded-lg backdrop-blur-md"
             style={{ 
               backgroundColor: 'rgba(15, 23, 42, 0.9)',
-              border: `1px solid ${getNodeColor(hoverNode.label || hoverNode.group)}40`
+              border: `1px solid ${hoverNode.color || getNodeColor(hoverNode.group)}40`
             }}
           >
             <div className="flex items-center gap-2 mb-1">
               <span 
                 className="w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: getNodeColor(hoverNode.label || hoverNode.group) }}
+                style={{ backgroundColor: hoverNode.color || getNodeColor(hoverNode.group) }}
               ></span>
               <span className="text-white font-medium text-sm">
-                {hoverNode.name || hoverNode.caption || hoverNode.id}
+                {hoverNode.label || hoverNode.name || hoverNode.caption || hoverNode.id}
               </span>
             </div>
             <div className="text-slate-400 text-xs">
-              {hoverNode.label || hoverNode.group} - {hoverNode.neighbors?.size || 0} connections
+              {hoverNode.group} - {hoverNode.neighbors?.size || 0} connections
             </div>
           </div>
         )}
@@ -313,7 +300,7 @@ function GraphDashboard() {
             className="absolute top-0 right-0 z-20 h-full w-80 overflow-y-auto"
             style={{ 
               backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              borderLeft: `2px solid ${getNodeColor(selectedNode.label || selectedNode.group)}`,
+              borderLeft: `2px solid ${selectedNode.color || getNodeColor(selectedNode.group)}`,
               backdropFilter: 'blur(12px)'
             }}
           >
@@ -322,10 +309,10 @@ function GraphDashboard() {
                 <div className="flex items-center gap-2">
                   <span 
                     className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: getNodeColor(selectedNode.label || selectedNode.group) }}
+                    style={{ backgroundColor: selectedNode.color || getNodeColor(selectedNode.group) }}
                   ></span>
                   <span className="text-xs uppercase tracking-wider text-slate-400">
-                    {selectedNode.label || selectedNode.group}
+                    {selectedNode.group}
                   </span>
                 </div>
                 <button 
@@ -337,85 +324,31 @@ function GraphDashboard() {
               </div>
               
               <h3 className="text-white text-lg font-semibold mb-4">
-                {selectedNode.name || selectedNode.caption || selectedNode.id}
+                {selectedNode.label || selectedNode.name || selectedNode.caption || selectedNode.id}
               </h3>
               
-              {(selectedNode.label || selectedNode.group) === 'Topic' && (
-                <>
-                  {selectedNode.contexts && selectedNode.contexts.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-purple-400 text-xs uppercase tracking-wider mb-2 font-medium">
-                        Strategic Context
-                      </h4>
-                      <div className="space-y-3">
-                        {selectedNode.contexts.map((context, idx) => (
-                          <div 
-                            key={idx}
-                            className="p-3 rounded-lg text-sm text-slate-200 leading-relaxed"
-                            style={{ backgroundColor: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.2)' }}
-                          >
-                            {context}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {selectedNode.evidence && selectedNode.evidence.length > 0 && (
-                    <div>
-                      <h4 className="text-slate-400 text-xs uppercase tracking-wider mb-2 font-medium">
-                        Supporting Evidence ({selectedNode.evidence.length} ads)
-                      </h4>
-                      <div className="space-y-2">
-                        {selectedNode.evidence.slice(0, 5).map((ev, idx) => (
-                          <div 
-                            key={idx}
-                            className="p-3 rounded-lg text-xs"
-                            style={{ backgroundColor: 'rgba(100, 116, 139, 0.1)', border: '1px solid rgba(100, 116, 139, 0.2)' }}
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span 
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: getPlatformColor(ev.platform) }}
-                              ></span>
-                              <span className="text-slate-400">{ev.platform || 'Unknown'}</span>
-                              <span className="text-slate-500">-</span>
-                              <span className="text-slate-500">{formatDate(ev.date)}</span>
-                            </div>
-                            <p className="text-slate-300 line-clamp-2">
-                              {ev.text || 'No ad text available'}
-                            </p>
-                            {ev.url && (
-                              <a 
-                                href={ev.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-400 hover:text-blue-300 text-xs mt-1 inline-block"
-                              >
-                                View Ad
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                        {selectedNode.evidence.length > 5 && (
-                          <p className="text-slate-500 text-xs">
-                            +{selectedNode.evidence.length - 5} more ads
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {(!selectedNode.contexts || selectedNode.contexts.length === 0) && 
-                   (!selectedNode.evidence || selectedNode.evidence.length === 0) && (
-                    <p className="text-slate-500 text-sm italic">
-                      No context data available for this topic yet.
+              {selectedNode.group === 'Topic' && (
+                <div>
+                  <div className="mb-4">
+                    <h4 className="text-purple-400 text-xs uppercase tracking-wider mb-1 font-medium">
+                      Market Volume
+                    </h4>
+                    <p className="text-slate-200 text-sm">
+                      Node size reflects relative market importance
                     </p>
-                  )}
-                </>
+                  </div>
+                  <div>
+                    <h4 className="text-slate-400 text-xs uppercase tracking-wider mb-1 font-medium">
+                      Connections
+                    </h4>
+                    <p className="text-slate-200 text-sm">
+                      {selectedNode.neighbors?.size || 0} brands covering this topic
+                    </p>
+                  </div>
+                </div>
               )}
               
-              {(selectedNode.label || selectedNode.group) === 'Brand' && (
+              {selectedNode.group === 'Brand' && (
                 <div>
                   {selectedNode.industry && (
                     <div className="mb-4">

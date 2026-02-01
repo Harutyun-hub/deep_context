@@ -13,115 +13,74 @@ app.get('/api/graph', async (req, res) => {
   
   try {
     const query = `
-      MATCH (b:Brand)
-      OPTIONAL MATCH (b)-[pub:PUBLISHED]->(a:Ad)-[ct:COVERS_TOPIC]->(t:Topic)
-      RETURN 
-        elementId(b) as brandId,
-        b.name as brandName,
-        b.industry as brandIndustry,
-        elementId(t) as topicId,
-        t.name as topicName,
-        ct.context as context,
-        elementId(a) as adId,
-        a.text as adText,
-        a.url as adUrl,
-        CASE WHEN a.date IS NOT NULL THEN toString(a.date) ELSE null END as adDate,
-        pub.platform as platform
+      // 1. MATCH: Traverse the full path but keep data server-side
+      MATCH (b:Brand)-[:PUBLISHED]->(a:Ad)-[:COVERS_TOPIC]->(t:Topic)
+      
+      // 2. AGGREGATE: Collapse Ads into weights
+      WITH b, t, count(a) AS weight
+      WHERE weight >= 1 
+      
+      // 3. RANKING: Calculate Global Topic Volume to find the "Market Leaders"
+      WITH t, sum(weight) AS topicGlobalVol, collect({source: elementId(b), target: elementId(t), value: weight}) AS brandLinks
+      ORDER BY topicGlobalVol DESC
+      LIMIT 80
+      
+      // 4. FORMATTING: Build the node lists
+      WITH collect(t) AS topics, collect(brandLinks) AS linkGroups, collect(topicGlobalVol) AS volumes
+      WITH topics, volumes, [link IN reduce(acc=[], g IN linkGroups | acc + g) | link] AS allLinks
+      
+      // 5. CLEANUP: Get only the Brands involved in these top topics
+      UNWIND allLinks AS l
+      MATCH (b:Brand) WHERE elementId(b) = l.source
+      WITH topics, volumes, allLinks, collect(DISTINCT b) AS brands
+      
+      // 6. RETURN: A single, pre-calculated JSON object for React
+      RETURN {
+        nodes: 
+          [brand IN brands | {
+            id: elementId(brand), 
+            group: 'Brand', 
+            label: brand.name, 
+            radius: 30,
+            color: '#3b82f6'
+          }] + 
+          [i IN range(0, size(topics)-1) | {
+            id: elementId(topics[i]), 
+            group: 'Topic', 
+            label: topics[i].name, 
+            radius: 5 + toInteger(log(volumes[i]) * 5),
+            color: '#a855f7'
+          }],
+        links: allLinks
+      } AS graphData
     `;
     
     const result = await session.run(query);
     
-    const brandNodesMap = new Map();
-    const topicNodesMap = new Map();
-    const linksMap = new Map();
-    const processedAdsByTopic = new Map();
-    const processedContextsByTopic = new Map();
-    
-    result.records.forEach(record => {
-      const brandId = record.get('brandId');
-      const brandName = record.get('brandName');
-      const brandIndustry = record.get('brandIndustry');
-      const topicId = record.get('topicId');
-      const topicName = record.get('topicName');
-      const context = record.get('context');
-      const adId = record.get('adId');
-      const adText = record.get('adText');
-      const adUrl = record.get('adUrl');
-      const adDate = record.get('adDate');
-      const platform = record.get('platform');
+    if (result.records.length > 0) {
+      const graphData = result.records[0].get('graphData');
       
-      if (!brandId) return;
+      const processedNodes = graphData.nodes.map(node => ({
+        id: node.id,
+        group: node.group,
+        label: node.label,
+        radius: typeof node.radius === 'object' ? node.radius.toNumber() : node.radius,
+        color: node.color
+      }));
       
-      if (!brandNodesMap.has(brandId)) {
-        brandNodesMap.set(brandId, {
-          id: brandId,
-          group: 'Brand',
-          caption: brandName || brandId,
-          industry: brandIndustry
-        });
-      }
+      const processedLinks = graphData.links.map(link => ({
+        source: link.source,
+        target: link.target,
+        value: typeof link.value === 'object' ? link.value.toNumber() : link.value
+      }));
       
-      if (topicId) {
-        if (!topicNodesMap.has(topicId)) {
-          topicNodesMap.set(topicId, {
-            id: topicId,
-            group: 'Topic',
-            caption: topicName || topicId,
-            contexts: [],
-            evidence: []
-          });
-          processedAdsByTopic.set(topicId, new Set());
-          processedContextsByTopic.set(topicId, new Set());
-        }
-        
-        const topicNode = topicNodesMap.get(topicId);
-        const topicAds = processedAdsByTopic.get(topicId);
-        const topicContexts = processedContextsByTopic.get(topicId);
-        
-        if (context && !topicContexts.has(context)) {
-          topicContexts.add(context);
-          topicNode.contexts.push(context);
-        }
-        
-        if (adId && !topicAds.has(adId)) {
-          topicAds.add(adId);
-          if (adText) {
-            topicNode.evidence.push({
-              adId: adId,
-              text: adText,
-              url: adUrl,
-              date: adDate,
-              platform: platform
-            });
-          }
-        }
-        
-        const linkKey = `${brandId}->${topicId}::${platform || 'unknown'}`;
-        if (!linksMap.has(linkKey)) {
-          linksMap.set(linkKey, {
-            source: brandId,
-            target: topicId,
-            type: 'COVERS_TOPIC',
-            platform: platform || 'unknown',
-            value: 1
-          });
-        } else {
-          linksMap.get(linkKey).value += 1;
-        }
-      }
-    });
-    
-    const nodes = [
-      ...Array.from(brandNodesMap.values()),
-      ...Array.from(topicNodesMap.values())
-    ];
-    
-    const graphData = {
-      nodes: nodes,
-      links: Array.from(linksMap.values())
-    };
-    
-    res.json(graphData);
+      res.json({
+        nodes: processedNodes,
+        links: processedLinks
+      });
+    } else {
+      res.json({ nodes: [], links: [] });
+    }
   } catch (error) {
     console.error('Error fetching graph data:', error.message);
     res.status(500).json({ error: 'Failed to fetch graph data', details: error.message });
