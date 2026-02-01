@@ -9,10 +9,10 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/api/graph', async (req, res) => {
-  const session = driver.session();
+  const topicSession = driver.session();
+  const platformSession = driver.session();
   
   try {
-    // Separate queries for topic and platform aggregation to avoid cross-multiplication
     const topicQuery = `
       MATCH (b:Brand)-[:PUBLISHED]->(ad:Ad)-[:COVERS_TOPIC]->(t:Topic)
       WITH b, t, count(ad) as weight
@@ -33,10 +33,9 @@ app.get('/api/graph', async (req, res) => {
         weight, 'ACTIVE_ON' as relType
     `;
     
-    // Run both queries in parallel
     const [topicResult, platformResult] = await Promise.all([
-      session.run(topicQuery),
-      session.run(platformQuery)
+      topicSession.run(topicQuery),
+      platformSession.run(platformQuery)
     ]);
     
     const nodesMap = new Map();
@@ -103,7 +102,8 @@ app.get('/api/graph', async (req, res) => {
     console.error('Error fetching graph data:', error.message);
     res.status(500).json({ error: 'Failed to fetch graph data', details: error.message });
   } finally {
-    await session.close();
+    await topicSession.close();
+    await platformSession.close();
   }
 });
 
