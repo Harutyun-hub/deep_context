@@ -1,0 +1,35 @@
+I have upgraded my Neo4j backend to a new "Enterprise Schema," but my frontend Dashboard is out of sync. It is currently under-fetching data (showing only 5 brands instead of the 13 that exist in the DB).
+
+Here is the full context of my system. Please update my `server.js` (Backend) and `GraphDashboard.jsx` (Frontend) to match this new reality.
+
+### 1. THE NEW DATABASE SCHEMA (Neo4j)
+My data is now strictly structured as follows:
+- **Nodes:**
+  - `(:Brand {id, name, industry})`
+  - `(:Ad {id, text, url, date: datetime()})`  <-- Note: Date is now a native Neo4j object, not a string.
+  - `(:Topic {name})`
+- **Relationships:**
+  - `(:Brand)-[:PUBLISHED {platform: 'Instagram'}]->(:Ad)`
+  - `(:Ad)-[:COVERS_TOPIC {context: 'Rich description...'}]->(:Topic)`
+
+### 2. THE PROBLEM
+- **Database Reality:** I have 13 distinct Brands in Neo4j.
+- **Frontend Reality:** The dashboard only renders ~5 Brands.
+- **Root Cause:** The current Cypher query in `server.js` likely has a filter like `WHERE weight > 2` or requires strict connections. This hides brands that have low ad volume (e.g., just 1 test ad) or no shared topics yet.
+
+### 3. THE TASKS (Code Updates Required)
+
+**Task A: Fix `server.js` (The API Endpoint)**
+Write a new `/api/graph` Cypher query that:
+1.  **Removes Aggressive Filters:** Do NOT filter by `weight > X`. I want to see ALL brands, even if they only have 1 ad.
+2.  **Fetches Rich Context:** Retrieve the `r.context` string from the `[COVERS_TOPIC]` relationship so we can show it in the UI.
+3.  **Handles Dates:** Convert the Neo4j `datetime()` object to a standard ISO string string (toString(a.date)) so the frontend doesn't crash.
+4.  **Structure:** Return a JSON with `nodes` (Brands, Topics) and `links`.
+
+**Task B: Fix `GraphDashboard.jsx` (The UI)**
+Update the React component to:
+1.  **Render the Context:** When a user clicks a Topic node, the Side Panel must show the `context` string (e.g., "Subsidized 2% annual rate...") instead of just the topic name.
+2.  **Handle Disconnected Nodes:** Ensure that if a Brand has 0 topics, it still appears as a standalone node (don't filter it out).
+3.  **Color Coding:** Brands = Blue, Topics = Purple. Links = Colored by Platform (Instagram=Pink, Facebook=Blue, Website=Green).
+
+Please provide the corrected `server.js` query and the updated `GraphDashboard.jsx` code.
