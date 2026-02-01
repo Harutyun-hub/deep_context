@@ -1,0 +1,53 @@
+You are absolutely right. The Rich Context is the most valuable piece of intelligence we generated, so it must be front-and-center when the user investigates a topic.
+
+Here is the updated, specific instruction set for your AI Agent. I have added a dedicated section emphasizing that the Click Interaction is the primary way this data is revealed.
+
+Prompt for AI Agent (Updated):
+
+"I need you to refactor my full stack application (Backend & Frontend) to support a new 'Enterprise Graph Schema' in Neo4j. Currently, the dashboard is filtering out most of my data and failing to show the new intelligence we generated.
+
+Here is the exact logic for what needs to change:
+
+PART 1: Backend Logic (server.js)
+Fix the 'Missing Brands' Bug (Priority):
+
+Remove any aggressive filters like WHERE weight > 2.
+
+Use OPTIONAL MATCH logic. I need to see ALL 13 Brands returned in the JSON, even if they have zero ads or connections. Do not hide 'small' nodes.
+
+Extract the 'Rich Context' (The Intelligence):
+
+In the database, the strategy explanation is stored on the relationship: (:Ad)-[:COVERS_TOPIC {context: '...'}]->(:Topic).
+
+You must extract this context string.
+
+Aggregation: Since a Topic might be connected to multiple Ads, collect these contexts into a list (or pick the most distinct one) and bundle it inside the Topic Node's data payload.
+
+Data Type Safety:
+
+Convert Neo4j datetime() objects to Strings (toString(a.date)) before sending to the frontend to prevent crashes.
+
+Extract the platform string from the [:PUBLISHED] relationship to use for link coloring.
+
+PART 2: Frontend Logic (GraphDashboard.jsx)
+The 'Click' Interaction (Critical):
+
+Current Behavior: Clicking a dot just shows the name.
+
+Required Behavior: When a user clicks a Topic Node (the purple dots), the UI must display the Rich Context string we fetched from the backend.
+
+Implementation:
+
+Open a Side Panel or detailed view upon click.
+
+Display the context text prominently (e.g., 'Subsidized 2% annual rate for students...') as the description of the topic.
+
+Below the context, list the supporting 'Evidence' (ad snippets and dates) so the user understands why that context exists.
+
+Visual Logic:
+
+Dynamic Links: Color the lines between Brand and Topic based on the platform (Pink for Instagram, Blue for Facebook, etc.).
+
+Node Visibility: Ensure unconnected Brand nodes are visible (do not filter them out).
+
+Summary: The goal is to ensure that when I click a Topic node in the dashboard, I don't just see 'Student Loans'. I must see the full sentence explaining the strategy ('Student Loans with 2% subsidized rate...'). Sync the backend query and frontend click-handler to make this happen."
