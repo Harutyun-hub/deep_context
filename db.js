@@ -1,4 +1,4 @@
-const neo4j = require('neo4j-driver');
+import neo4j from 'neo4j-driver';
 
 const driver = neo4j.driver(
   process.env.NEO4J_URI,
@@ -24,9 +24,9 @@ async function closeDriver() {
   await driver.close();
 }
 
-module.exports = { driver, testConnection, closeDriver };
+export { driver, testConnection, closeDriver };
 
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   testConnection()
     .then(() => closeDriver())
     .catch(() => process.exit(1));
