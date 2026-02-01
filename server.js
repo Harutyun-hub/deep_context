@@ -9,101 +9,92 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/api/graph', async (req, res) => {
-  const topicSession = driver.session();
-  const platformSession = driver.session();
+  const session = driver.session();
   
   try {
-    const topicQuery = `
-      MATCH (b:Brand)-[:PUBLISHED]->(ad:Ad)-[:COVERS_TOPIC]->(t:Topic)
-      WITH b, t, count(ad) as weight
-      WHERE weight > 2
-      RETURN 
-        { id: elementId(b), label: 'Brand', name: b.name } as source,
-        { id: elementId(t), label: 'Topic', name: t.name } as target,
-        weight, 'FOCUSES_ON' as relType
+    const brandsQuery = `
+      MATCH (b:Brand)
+      RETURN elementId(b) as id, b.name as name, b.industry as industry
     `;
     
-    const platformQuery = `
-      MATCH (b:Brand)-[:PUBLISHED]->(ad:Ad)-[:ON_PLATFORM]->(p:Platform)
-      WITH b, p, count(ad) as weight
-      WHERE weight > 2
-      RETURN 
-        { id: elementId(b), label: 'Brand', name: b.name } as source,
-        { id: elementId(p), label: 'Platform', name: p.name } as target,
-        weight, 'ACTIVE_ON' as relType
+    const topicsQuery = `
+      MATCH (t:Topic)<-[ct:COVERS_TOPIC]-(ad:Ad)<-[pub:PUBLISHED]-(b:Brand)
+      WITH t, 
+           COLLECT(DISTINCT ct.context) as allContexts,
+           COLLECT(DISTINCT {
+             adId: elementId(ad),
+             text: ad.text,
+             url: ad.url,
+             date: CASE WHEN ad.date IS NOT NULL THEN toString(ad.date) ELSE null END,
+             platform: pub.platform
+           }) as allEvidence
+      RETURN elementId(t) as id, t.name as name, allContexts as contexts, allEvidence as evidence
     `;
     
-    const [topicResult, platformResult] = await Promise.all([
-      topicSession.run(topicQuery),
-      platformSession.run(platformQuery)
+    const linksQuery = `
+      MATCH (b:Brand)-[pub:PUBLISHED]->(ad:Ad)-[ct:COVERS_TOPIC]->(t:Topic)
+      WITH b, t, pub.platform as platform, COUNT(DISTINCT ad) as adCount
+      RETURN elementId(b) as brandId, elementId(t) as topicId, platform, adCount as value
+    `;
+    
+    const [brandsResult, topicsResult, linksResult] = await Promise.all([
+      session.run(brandsQuery),
+      session.run(topicsQuery),
+      session.run(linksQuery)
     ]);
     
-    const nodesMap = new Map();
-    const linksMap = new Map();
+    const nodes = [];
+    const links = [];
     
-    // Helper to convert Neo4j integers to JS integers
-    const toInt = (value) => {
-      if (value === null || value === undefined) return 0;
-      if (typeof value === 'object' && value.toInt) return value.toInt();
-      return parseInt(value, 10) || 0;
-    };
-    
-    // Process results from both queries
-    const processRecords = (records) => {
-      records.forEach(record => {
-        const source = record.get('source');
-        const target = record.get('target');
-        const weight = record.get('weight');
-        const relType = record.get('relType');
-        
-        if (!source || !source.id || !target || !target.id) return;
-        
-        // Add source (Brand) node
-        if (!nodesMap.has(source.id)) {
-          nodesMap.set(source.id, {
-            id: source.id,
-            group: source.label,
-            caption: source.name || source.id
-          });
-        }
-        
-        // Add target (Topic or Platform) node
-        if (!nodesMap.has(target.id)) {
-          nodesMap.set(target.id, {
-            id: target.id,
-            group: target.label,
-            caption: target.name || target.id
-          });
-        }
-        
-        // Add link with integer weight
-        const linkKey = `${source.id}->${target.id}`;
-        if (!linksMap.has(linkKey)) {
-          linksMap.set(linkKey, {
-            source: source.id,
-            target: target.id,
-            type: relType,
-            value: toInt(weight)
-          });
-        }
+    brandsResult.records.forEach(record => {
+      nodes.push({
+        id: record.get('id'),
+        group: 'Brand',
+        caption: record.get('name') || record.get('id'),
+        industry: record.get('industry')
       });
+    });
+    
+    topicsResult.records.forEach(record => {
+      const contexts = record.get('contexts') || [];
+      const evidence = record.get('evidence') || [];
+      
+      const filteredContexts = contexts.filter(c => c !== null && c !== undefined);
+      const filteredEvidence = evidence.filter(e => e !== null && e.text);
+      
+      nodes.push({
+        id: record.get('id'),
+        group: 'Topic',
+        caption: record.get('name') || record.get('id'),
+        contexts: filteredContexts,
+        evidence: filteredEvidence
+      });
+    });
+    
+    const toInt = (value) => {
+      if (value === null || value === undefined) return 1;
+      if (typeof value === 'object' && value.toInt) return value.toInt();
+      return parseInt(value, 10) || 1;
     };
     
-    processRecords(topicResult.records);
-    processRecords(platformResult.records);
+    linksResult.records.forEach(record => {
+      links.push({
+        source: record.get('brandId'),
+        target: record.get('topicId'),
+        type: 'COVERS_TOPIC',
+        platform: record.get('platform') || 'unknown',
+        value: toInt(record.get('value'))
+      });
+    });
     
-    const graphData = {
-      nodes: Array.from(nodesMap.values()),
-      links: Array.from(linksMap.values())
-    };
+    const graphData = { nodes, links };
     
     res.json(graphData);
   } catch (error) {
     console.error('Error fetching graph data:', error.message);
     res.status(500).json({ error: 'Failed to fetch graph data', details: error.message });
   } finally {
-    await topicSession.close();
-    await platformSession.close();
+    await session.close();
   }
 });
 
