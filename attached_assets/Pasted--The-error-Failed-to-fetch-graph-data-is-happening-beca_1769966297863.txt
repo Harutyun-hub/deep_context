@@ -1,0 +1,43 @@
+"The error Failed to fetch graph data is happening because you are using Promise.all with a single Neo4j session. Neo4j sessions are not thread-safe; you cannot run parallel queries on one session.
+
+Do NOT just open multiple sessions. That is inefficient. Instead, refactor the backend to use a Single Atomic Query architecture. This solves the error and the 'missing data' bug simultaneously.
+
+Here is the strict logic you must implement:
+
+1. BACKEND REFACTOR (server.js)
+The 'Single Query' Strategy: Instead of fetching Brands in one query and Topics in another, write ONE Cypher query that retrieves everything.
+
+Logic:
+
+Start by finding ALL (b:Brand) nodes.
+
+Use OPTIONAL MATCH to traverse to Ads (b)-[:PUBLISHED]->(a).
+
+Use OPTIONAL MATCH to traverse to Topics (a)-[:COVERS_TOPIC]->(t).
+
+Crucial: Return the results as a flat table and reconstruct the 'Nodes' and 'Links' arrays in JavaScript.
+
+Why this fixes the bug: You only run session.run() once. There is no parallelism, so the session error disappears.
+
+Data Requirement: In this same query, ensure you extract:
+
+toString(a.date) (Fixes the object crash).
+
+r.context (The rich intelligence string).
+
+pub.platform (For link coloring).
+
+2. FRONTEND LOGIC (GraphDashboard.jsx)
+The 'Click-to-Reveal' Interaction: While fixing the crash, you must also ensure the UI displays the data correctly:
+
+Event Handler: Update the onNodeClick handler. When a user clicks a Topic Node (not a Brand), it must trigger the Side Panel.
+
+Data Binding: Inside that Side Panel:
+
+Headline: Display the Topic Name.
+
+Description: Display the Rich Context string we fetched from the backend (e.g., 'Student loans with 2% subsidized rate...'). Do not hide this. It is the most important part of the dashboard.
+
+Evidence List: Below the text, render the list of Ad Snippets and Dates associated with that topic.
+
+Summary of Fix: Replace the Promise.all logic with a single session.run() executing one master query. This will fix the crash, ensure all 13 brands appear (because of OPTIONAL MATCH), and provide the rich context needed for the Side Panel."
