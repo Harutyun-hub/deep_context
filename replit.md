@@ -57,7 +57,14 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **AI Vision Analysis**: Visual Intercept section displays AI-analyzed screenshots with "AI Tactical Insight" panel showing marketing intent headline and AI analysis subtext when `promotions_detected=true` or `ai_analysis` exists.
 - **Website AI Analysis Tab**: Glassmorphism-styled screenshot viewer in the Competitive Intelligence Suite. Features: (1) Company dropdown selector to choose competitor, (2) Hero screenshot with glassmorphism frame and gradient borders, (3) Time slider scrubber for scrolling through screenshot history (oldest to newest), (4) AI Insight Panel with marketing intent headline, AI analysis description, promotions detected badge, and visit website link. Uses `company_screenshots` table with `marketing_intent`, `ai_analysis`, and `promotions_detected` columns. CSS includes animated glows, frosted glass effects, and smooth transitions.
 
-- **Graph Dashboard**: React-based interactive force-directed graph visualization at `frontend/`. Uses `react-force-graph-2d` to display Neo4j graph data from `/api/graph`. Features neon glow nodes with custom canvas rendering (`nodeCanvasObject` with `ctx.shadowBlur`), color-coded node groups (Ad, Platform, Campaign, AdSet, Creative, Account), curved links with directional particles, click-to-zoom navigation, and glassmorphism UI panels (header showing node/connection counts, legend). Dark cyberpunk aesthetic with gradient background.
+- **Strategic Map (Graph Dashboard)**: React-based interactive force-directed graph visualization at `frontend/`. Uses `react-force-graph-2d` to display Neo4j graph data from `/api/graph`. Features:
+  - **War Room Card Container**: Professional rounded-2xl card with subtle shadow, glassmorphism header showing entity/connection counts, and inline legend (Brands/Topics/Platforms)
+  - **Deep Space Blue Canvas (#0f172a)**: Dark background that makes data pop
+  - **Neon Intelligence Palette**: Brands (Neon Blue #3b82f6 with 15px glow), Topics (Neon Purple #a855f7), Platforms (Neon Orange #f97316)
+  - **Strategic Visuals**: Link thickness using `sqrt(link.value)+1` formula (thick = core strategy, thin = occasional mentions); Node sizing with Brands=20 (massive anchors), Topics/Platforms sized by `sqrt(weight)*3+4`
+  - **Physics Engine**: Strong repulsion (`charge.strength(-400)`) and longer link distance (120px) for readability
+  - **Interactivity**: Hover highlighting (dims non-connected nodes to 15% opacity, shows tooltip with entity name/type/connections), click-to-zoom (centers and zooms to 2.5x), background click resets highlights
+  - **Tailwind CSS**: Configured with `@tailwindcss/postcss` for styling
 
 ## External Dependencies
 - **Supabase**: User authentication (Google OAuth), PostgreSQL database, and Row Level Security.
