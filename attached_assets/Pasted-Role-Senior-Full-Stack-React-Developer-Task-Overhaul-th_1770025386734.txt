@@ -1,0 +1,85 @@
+Role: Senior Full-Stack React Developer Task: Overhaul the existing Graph Dashboard UI to match the new "Dark Mode" design provided in the attached Figma code, while maintaining full connectivity to our existing Neo4j backend.
+
+Context: I have paste/attached the new UI components generated from Figma. I need you to replace our current dashboard layout with this new design. The backend logic (Neo4j driver, API calls) is already working; do not break it. We are simply "re-skinning" the app and adding client-side filtering logic.
+
+Step-by-Step Implementation Plan:
+
+1. Dependency Check
+
+Ensure we have react-force-graph-3d installed for the visualization.
+
+Ensure we have lucide-react for the icons (Chevron, Info, Search).
+
+Ensure we have framer-motion (optional) or standard CSS transitions for the collapsible sidebars.
+
+2. Layout & Global Styling (The "Matrix" Look)
+
+Background: Apply the specific "Engineering Dot Grid" to the main canvas container behind the graph.
+
+CSS Rule: background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1.5px, transparent 1.5px); background-size: 24px 24px; background-color: #0b0e14;
+
+Structure: Implement a strict 3-column layout:
+
+Left: Fixed Sidebar (Filters).
+
+Center: Relative Canvas (The Graph + Floating Legend).
+
+Right: Collapsible Detail Panel (Node Details).
+
+3. Sidebar Logic (The "Brain")
+
+Migrate the new Figma Sidebar component.
+
+State Integration: Create a shared state object (e.g., dashboardState) in the parent page that tracks:
+
+selectedBanks: Array of strings.
+
+connectionThreshold: Number (0-100) — This comes from the new Slider.
+
+sentimentFilter: 'positive' | 'negative' | 'neutral'.
+
+selectedTopics: Array of strings.
+
+Crucial: The "Connection Strength" slider in the sidebar must update the connectionThreshold state in real-time.
+
+4. The Graph Component (The "Engine")
+
+Use ForceGraph3D.
+
+Filtering: Inside the render loop, filter the displayed links based on the connectionThreshold. If a link's weight/volume is below the threshold, do not render it.
+
+Styling:
+
+Nodes: Spheres. Color by Category (Blue=Brand, Purple=Topic).
+
+Links: Curved lines (curved={0.2}). High transparency (0.2).
+
+Interactivity: On node click, populate the Right Panel with the node's data.
+
+5. The Legend (Floating)
+
+Implement the provided Legend component as an absolute positioned element at bottom: 20px; left: 50%; transform: translateX(-50%);.
+
+Ensure it sits on top of the canvas (z-index: 10).
+
+Reference Data:
+
+Figma Code: [PASTE YOUR FIGMA COMPONENT CODE HERE OR REFERENCE THE FILE]
+
+Current Backend: [REFERENCE YOUR CURRENT API/NEO4J FILE]
+
+Action: Please refactor the main dashboard page to use this new layout and connect the filters. Start by setting up the main grid container.
+
+Pre-flight Checklist for You
+Before you hit enter in Replit, make sure you do these two things:
+
+Paste the CSS: Replit might struggle to generate the "Dot Matrix" background perfectly from pure description. If it fails, paste this CSS snippet directly into the chat:
+
+CSS
+.graph-canvas-bg {
+  background-color: #0b0e14;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%);
+}
+The "Slider" Data: Ensure your Neo4j data actually returns a "weight" or "count" property on the relationships (links). The slider needs a number to filter against (e.g., "Show me links with weight > 5"). If your data doesn't have this, ask Replit to "mock a weight property" temporarily.
