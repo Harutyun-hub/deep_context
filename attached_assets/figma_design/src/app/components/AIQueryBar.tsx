@@ -1,4 +1,5 @@
 import { Sparkles, Search } from 'lucide-react';
+import { Input } from '@/app/components/ui/input';
 
 export function AIQueryBar() {
   return (

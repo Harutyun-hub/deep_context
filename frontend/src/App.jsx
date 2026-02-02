@@ -23,13 +23,13 @@ function App() {
   const [highlightNodes, setHighlightNodes] = useState(new Set());
   const [highlightLinks, setHighlightLinks] = useState(new Set());
   const [hoverNode, setHoverNode] = useState(null);
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const graphRef = useRef();
 
   const [filters, setFilters] = useState({
     selectedTimeframe: 'Last 7 Days',
     selectedBrands: [],
     selectedSentiments: [],
+    selectedTactics: [],
     selectedTopics: [],
     connectionThreshold: 0
   });
@@ -360,8 +360,6 @@ function App() {
         topics={topics}
         filters={filters}
         onFilterChange={setFilters}
-        isCollapsed={filtersCollapsed}
-        onToggleCollapse={() => setFiltersCollapsed(!filtersCollapsed)}
       />
       
       {selectedNode && (
@@ -432,14 +430,6 @@ function App() {
       />
       
       <GraphLegend />
-      
-      <div className="fixed top-28 right-6 z-30 text-right">
-        <div className="bg-slate-950/40 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-2">
-          <p className="text-white/60 text-xs">
-            {filteredGraphData.nodes.length} entities - {filteredGraphData.links.length} connections
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

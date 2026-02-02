@@ -1,5 +1,10 @@
 import { X, ExternalLink, TrendingUp } from 'lucide-react';
 
+interface NodeInspectorProps {
+  node?: any;
+  onClose: () => void;
+}
+
 const SAMPLE_ADS = [
   {
     id: 1,
@@ -18,23 +23,16 @@ const SAMPLE_ADS = [
   }
 ];
 
-export function NodeInspector({ node, onClose }) {
+export function NodeInspector({ node, onClose }: NodeInspectorProps) {
   if (!node) return null;
-
-  const nodeLabel = node.label || node.name || node.id;
-  const nodeType = node.group || 'Topic';
-  const connections = node.neighbors?.size || 0;
 
   return (
     <div className="fixed right-6 top-28 bottom-6 w-96 bg-slate-950/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col z-40 overflow-hidden">
       {/* Header */}
       <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div 
-            className="w-3 h-3 rounded-full" 
-            style={{ backgroundColor: nodeType === 'Brand' ? '#3b82f6' : '#a855f7' }}
-          />
-          <h2 className="text-white/90 font-semibold">{nodeLabel}</h2>
+          <div className="w-3 h-3 rounded-full bg-purple-400" />
+          <h2 className="text-white/90 font-semibold">{node.name}</h2>
         </div>
         <button
           onClick={onClose}

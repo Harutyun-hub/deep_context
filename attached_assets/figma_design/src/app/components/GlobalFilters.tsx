@@ -1,7 +1,15 @@
-import { Calendar } from 'lucide-react';
-import { Checkbox } from './ui/Checkbox';
-import { Switch } from './ui/Switch';
-import { Slider } from './ui/Slider';
+import { Calendar, ChevronDown } from 'lucide-react';
+import { Checkbox } from '@/app/components/ui/checkbox';
+import { Switch } from '@/app/components/ui/switch';
+import { Slider } from '@/app/components/ui/slider';
+import { useState } from 'react';
+
+const BRANDS = [
+  { name: 'Fast Bank', count: 840 },
+  { name: 'Ameriabank', count: 623 },
+  { name: 'ID Bank', count: 512 },
+  { name: 'VTB Armenia', count: 387 },
+];
 
 const SENTIMENTS = [
   { name: 'Negative', color: 'bg-red-500' },
@@ -21,59 +29,22 @@ const TOPIC_CATEGORIES = [
 
 const TIMEFRAMES = ['Last 24h', 'Last 7 Days', 'Last Month', 'Custom'];
 
-export function GlobalFilters({ 
-  brands = [],
-  topics = [],
-  filters,
-  onFilterChange
-}) {
-  const showCustomDate = filters.selectedTimeframe === 'Custom';
+export function GlobalFilters() {
+  const [selectedTimeframe, setSelectedTimeframe] = useState('Last 7 Days');
+  const [selectedBrands, setSelectedBrands] = useState<string[]>(['Fast Bank', 'Ameriabank']);
+  const [selectedSentiments, setSelectedSentiments] = useState<string[]>(['Negative']);
+  const [selectedTactics, setSelectedTactics] = useState<string[]>(['Scarcity']);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(['Service Quality', 'Interest Rates']);
+  const [showCustomDate, setShowCustomDate] = useState(false);
+  const [connectionStrength, setConnectionStrength] = useState([50]);
 
-  const handleTimeframeClick = (timeframe) => {
-    onFilterChange({ ...filters, selectedTimeframe: timeframe });
-  };
-
-  const handleBrandToggle = (brandName) => {
-    const newBrands = filters.selectedBrands.includes(brandName)
-      ? filters.selectedBrands.filter(b => b !== brandName)
-      : [...filters.selectedBrands, brandName];
-    onFilterChange({ ...filters, selectedBrands: newBrands });
-  };
-
-  const handleSentimentToggle = (sentiment) => {
-    const newSentiments = filters.selectedSentiments.includes(sentiment)
-      ? filters.selectedSentiments.filter(s => s !== sentiment)
-      : [...filters.selectedSentiments, sentiment];
-    onFilterChange({ ...filters, selectedSentiments: newSentiments });
-  };
-
-  const handleTacticToggle = (tactic) => {
-    const newTactics = filters.selectedTactics?.includes(tactic)
-      ? filters.selectedTactics.filter(t => t !== tactic)
-      : [...(filters.selectedTactics || []), tactic];
-    onFilterChange({ ...filters, selectedTactics: newTactics });
-  };
-
-  const handleTopicToggle = (topic) => {
-    const newTopics = filters.selectedTopics.includes(topic)
-      ? filters.selectedTopics.filter(t => t !== topic)
-      : [...filters.selectedTopics, topic];
-    onFilterChange({ ...filters, selectedTopics: newTopics });
-  };
-
-  const handleConnectionStrengthChange = (value) => {
-    onFilterChange({ ...filters, connectionThreshold: value[0] });
-  };
-
-  const handleReset = () => {
-    onFilterChange({
-      selectedTimeframe: 'Last 7 Days',
-      selectedBrands: [],
-      selectedSentiments: [],
-      selectedTactics: [],
-      selectedTopics: [],
-      connectionThreshold: 0
-    });
+  const handleTimeframeClick = (timeframe: string) => {
+    setSelectedTimeframe(timeframe);
+    if (timeframe === 'Custom') {
+      setShowCustomDate(true);
+    } else {
+      setShowCustomDate(false);
+    }
   };
 
   return (
@@ -98,7 +69,7 @@ export function GlobalFilters({
                 key={timeframe}
                 onClick={() => handleTimeframeClick(timeframe)}
                 className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                  filters.selectedTimeframe === timeframe
+                  selectedTimeframe === timeframe
                     ? 'bg-purple-500/30 border border-purple-500/50 text-purple-300 shadow-lg shadow-purple-500/20'
                     : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10'
                 }`}
@@ -123,41 +94,45 @@ export function GlobalFilters({
         {/* Brand Source Section */}
         <div className="space-y-3">
           <div className="text-white/70 text-sm font-medium">Brand Source</div>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {brands.slice(0, 10).map((brand) => (
+          <div className="space-y-2">
+            {BRANDS.map((brand) => (
               <label
                 key={brand.name}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 cursor-pointer transition-colors group"
               >
                 <Checkbox
-                  checked={filters.selectedBrands.includes(brand.name)}
-                  onCheckedChange={() => handleBrandToggle(brand.name)}
+                  checked={selectedBrands.includes(brand.name)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedBrands([...selectedBrands, brand.name]);
+                    } else {
+                      setSelectedBrands(selectedBrands.filter(b => b !== brand.name));
+                    }
+                  }}
+                  className="border-white/30 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
                 />
                 <span className="flex-1 text-white/80 text-sm group-hover:text-white">{brand.name}</span>
                 <span className="text-white/40 text-xs">({brand.count})</span>
               </label>
             ))}
-            {brands.length === 0 && (
-              <div className="text-white/40 text-xs text-center py-2">Loading brands...</div>
-            )}
           </div>
         </div>
 
         {/* Divider */}
         <div className="h-px bg-white/10" />
 
-        {/* Connection Strength Section */}
+        {/* Connection Strength Section - MOVED HERE */}
         <div className="space-y-3">
           <div className="text-white/70 text-sm font-medium">Connection Strength</div>
           <div className="px-3 py-3 rounded-lg bg-white/5 border border-white/10">
             <div className="flex items-center justify-between mb-2">
               <span className="text-white/40 text-xs">Low</span>
-              <span className="text-purple-400 text-xs font-medium">{filters.connectionThreshold}%</span>
+              <span className="text-purple-400 text-xs font-medium">{connectionStrength[0]}%</span>
               <span className="text-white/40 text-xs">High</span>
             </div>
             <Slider
-              value={[filters.connectionThreshold]}
-              onValueChange={handleConnectionStrengthChange}
+              value={connectionStrength}
+              onValueChange={setConnectionStrength}
               max={100}
               step={1}
               className="w-full"
@@ -182,8 +157,15 @@ export function GlobalFilters({
                   <span className="text-white/80 text-sm">{sentiment.name}</span>
                 </div>
                 <Switch
-                  checked={filters.selectedSentiments.includes(sentiment.name)}
-                  onCheckedChange={() => handleSentimentToggle(sentiment.name)}
+                  checked={selectedSentiments.includes(sentiment.name)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedSentiments([...selectedSentiments, sentiment.name]);
+                    } else {
+                      setSelectedSentiments(selectedSentiments.filter(s => s !== sentiment.name));
+                    }
+                  }}
+                  className="data-[state=checked]:bg-purple-500"
                 />
               </label>
             ))}
@@ -200,9 +182,15 @@ export function GlobalFilters({
             {TACTICS.map((tactic) => (
               <button
                 key={tactic}
-                onClick={() => handleTacticToggle(tactic)}
+                onClick={() => {
+                  if (selectedTactics.includes(tactic)) {
+                    setSelectedTactics(selectedTactics.filter(t => t !== tactic));
+                  } else {
+                    setSelectedTactics([...selectedTactics, tactic]);
+                  }
+                }}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  filters.selectedTactics?.includes(tactic)
+                  selectedTactics.includes(tactic)
                     ? 'bg-purple-500/30 border border-purple-500/50 text-purple-300'
                     : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10'
                 }`}
@@ -226,8 +214,15 @@ export function GlobalFilters({
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 cursor-pointer transition-colors group"
               >
                 <Checkbox
-                  checked={filters.selectedTopics.includes(topic)}
-                  onCheckedChange={() => handleTopicToggle(topic)}
+                  checked={selectedTopics.includes(topic)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedTopics([...selectedTopics, topic]);
+                    } else {
+                      setSelectedTopics(selectedTopics.filter(t => t !== topic));
+                    }
+                  }}
+                  className="border-white/30 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
                 />
                 <span className="flex-1 text-white/80 text-sm group-hover:text-white">{topic}</span>
               </label>
@@ -238,10 +233,7 @@ export function GlobalFilters({
 
       {/* Footer */}
       <div className="px-6 py-4 border-t border-white/10 flex gap-2">
-        <button 
-          onClick={handleReset}
-          className="flex-1 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white/70 text-sm hover:bg-white/10 transition-colors"
-        >
+        <button className="flex-1 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white/70 text-sm hover:bg-white/10 transition-colors">
           Reset
         </button>
         <button className="flex-1 px-4 py-2 rounded-lg bg-purple-500 text-white text-sm font-medium hover:bg-purple-600 transition-colors">
