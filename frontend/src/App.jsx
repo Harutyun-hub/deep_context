@@ -80,8 +80,8 @@ function App() {
   useEffect(() => {
     if (graphRef.current && graphData.nodes.length > 0) {
       const fg = graphRef.current;
-      fg.d3Force('charge').strength(-400);
-      fg.d3Force('link').distance(120);
+      fg.d3Force('charge').strength(-300);
+      fg.d3Force('link').distance(100);
       fg.d3ReheatSimulation();
     }
   }, [graphData]);
@@ -136,7 +136,6 @@ function App() {
       });
     }
 
-    // Topic filtering - show selected topics and their connected nodes
     if (filters.selectedTopics.length > 0) {
       const selectedTopicIds = new Set(
         graphData.nodes
@@ -144,14 +143,12 @@ function App() {
           .map(n => n.id)
       );
       
-      // Keep links that connect to selected topics
       filteredLinks = filteredLinks.filter(link => {
         const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
         const targetId = typeof link.target === 'object' ? link.target.id : link.target;
         return selectedTopicIds.has(sourceId) || selectedTopicIds.has(targetId);
       });
       
-      // Find all nodes connected to selected topics
       const connectedToTopics = new Set();
       filteredLinks.forEach(link => {
         const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
@@ -160,20 +157,16 @@ function App() {
         connectedToTopics.add(targetId);
       });
       
-      // Keep selected topics and their connected nodes
       filteredNodes = filteredNodes.filter(node => connectedToTopics.has(node.id));
     }
 
-    // Sentiment filtering - show nodes matching sentiment or nodes without sentiment property
     if (filters.selectedSentiments.length > 0) {
       const nodesToKeep = new Set();
       
       filteredNodes.forEach(node => {
-        // Keep nodes with matching sentiment
         if (node.sentiment && filters.selectedSentiments.includes(node.sentiment)) {
           nodesToKeep.add(node.id);
         }
-        // Keep Brand nodes (they don't have sentiment)
         if (node.group === 'Brand') {
           nodesToKeep.add(node.id);
         }
@@ -181,7 +174,6 @@ function App() {
       
       filteredNodes = filteredNodes.filter(node => nodesToKeep.has(node.id));
       
-      // Prune links to removed nodes
       const nodeIdSet = new Set(filteredNodes.map(n => n.id));
       filteredLinks = filteredLinks.filter(link => {
         const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
@@ -190,7 +182,6 @@ function App() {
       });
     }
 
-    // Final pruning: remove nodes with no connections (applies to all active filters)
     const hasActiveFilters = filters.connectionThreshold > 0 || 
                              filters.selectedBrands.length > 0 || 
                              filters.selectedTopics.length > 0 || 
@@ -208,7 +199,6 @@ function App() {
       filteredNodes = filteredNodes.filter(node => connectedNodeIds.has(node.id));
     }
 
-    // Ensure links only connect existing nodes
     const finalNodeIds = new Set(filteredNodes.map(n => n.id));
     filteredLinks = filteredLinks.filter(link => {
       const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
@@ -247,8 +237,8 @@ function App() {
   }, [graphData, filters, maxLinkWeight]);
 
   const getNodeSize = useCallback((node) => {
-    if (node.radius) return node.radius;
-    return node.group === 'Brand' ? 30 : 10;
+    if (node.group === 'Brand') return 18;
+    return 8;
   }, []);
 
   const handleNodeHover = useCallback((node) => {
@@ -273,7 +263,7 @@ function App() {
   const handleNodeClick = useCallback((node) => {
     if (graphRef.current && node) {
       graphRef.current.centerAt(node.x, node.y, 500);
-      graphRef.current.zoom(2.5, 500);
+      graphRef.current.zoom(2, 500);
       setSelectedNode(node);
     }
   }, []);
@@ -313,19 +303,14 @@ function App() {
     const label = node.label || node.name || node.caption || node.id;
     const nodeSize = getNodeSize(node);
     const nodeType = node.group;
-    const color = node.color || getNodeColor(nodeType);
-    const fontSize = Math.max(10 / globalScale, 2);
+    const color = getNodeColor(nodeType);
+    const fontSize = Math.max(12 / globalScale, 3);
     
     const isHighlighted = highlightNodes.size === 0 || highlightNodes.has(node.id);
     const isSelected = selectedNode && selectedNode.id === node.id;
-    const opacity = isHighlighted ? 1 : 0.15;
+    const opacity = isHighlighted ? 1 : 0.2;
     
     ctx.save();
-    
-    if (node.group === 'Brand' || isSelected) {
-      ctx.shadowBlur = isSelected ? 25 : 15;
-      ctx.shadowColor = isSelected ? '#ffffff' : color;
-    }
     
     ctx.globalAlpha = opacity;
     ctx.beginPath();
@@ -335,24 +320,23 @@ function App() {
     
     if (isSelected) {
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
     
-    ctx.shadowBlur = 0;
     ctx.beginPath();
-    ctx.arc(node.x, node.y, nodeSize * 0.5, 0, 2 * Math.PI, false);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.arc(node.x, node.y, nodeSize * 0.4, 0, 2 * Math.PI, false);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.fill();
     
-    if (globalScale > 0.5 && isHighlighted) {
-      ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
+    if (globalScale > 0.4 && isHighlighted) {
+      ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`;
       ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.9})`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       
-      const displayLabel = label.length > 15 ? label.substring(0, 15) + '...' : label;
-      ctx.fillText(displayLabel, node.x, node.y + nodeSize + 3);
+      const displayLabel = label.length > 18 ? label.substring(0, 18) + '...' : label;
+      ctx.fillText(displayLabel, node.x, node.y + nodeSize + 4);
     }
     
     ctx.restore();
@@ -367,17 +351,18 @@ function App() {
   }, [getNodeSize]);
 
   const getLinkColor = useCallback((link) => {
-    const baseColor = '#94a3b8';
+    const baseColor = '#64748b';
     if (highlightNodes.size === 0) {
-      return baseColor + '4D';
+      return baseColor + '40';
     }
     return highlightLinks.has(link) 
-      ? baseColor + 'CC'
-      : baseColor + '0D';
+      ? baseColor + 'AA'
+      : baseColor + '15';
   }, [highlightNodes, highlightLinks]);
 
   const getLinkWidth = useCallback((link) => {
-    const baseWidth = Math.sqrt(link.value || link.weight || 1) + 1;
+    const weight = link.value || link.weight || 1;
+    const baseWidth = Math.sqrt(weight) * 0.8 + 0.5;
     return highlightLinks.has(link) ? baseWidth * 1.5 : baseWidth;
   }, [highlightLinks]);
 
@@ -430,29 +415,6 @@ function App() {
       )}
       
       <div className="absolute inset-0">
-        {hoverNode && !selectedNode && (
-          <div 
-            className="absolute top-28 left-96 z-10 px-4 py-3 rounded-lg backdrop-blur-md ml-4"
-            style={{ 
-              backgroundColor: 'rgba(15, 23, 42, 0.9)',
-              border: `1px solid ${hoverNode.color || getNodeColor(hoverNode.group)}40`
-            }}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span 
-                className="w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: hoverNode.color || getNodeColor(hoverNode.group) }}
-              ></span>
-              <span className="text-white font-medium text-sm">
-                {hoverNode.label || hoverNode.name || hoverNode.caption || hoverNode.id}
-              </span>
-            </div>
-            <div className="text-slate-400 text-xs">
-              {hoverNode.group} - {hoverNode.neighbors?.size || 0} connections
-            </div>
-          </div>
-        )}
-        
         <ForceGraph2D
           ref={graphRef}
           graphData={filteredGraphData}
@@ -462,9 +424,9 @@ function App() {
           nodeVal={getNodeSize}
           linkColor={getLinkColor}
           linkWidth={getLinkWidth}
-          linkCurvature={0.15}
+          linkCurvature={0.1}
           d3AlphaDecay={0.02}
-          d3VelocityDecay={0.25}
+          d3VelocityDecay={0.3}
           warmupTicks={100}
           cooldownTicks={200}
           onNodeHover={handleNodeHover}
@@ -482,12 +444,14 @@ function App() {
         />
       </div>
       
-      <FloatingControls 
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onFit={handleFit}
-        onReset={handleReset}
-      />
+      {!selectedNode && (
+        <FloatingControls 
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onFit={handleFit}
+          onReset={handleReset}
+        />
+      )}
       
       <GraphLegend />
     </div>
