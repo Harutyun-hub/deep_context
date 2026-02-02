@@ -23,7 +23,7 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Dashboard Design**: Glass filter section, blue table headers, collapsible content sections.
 - **Competitive Intelligence Suite**: 4-pillar tabbed navigation for Battlefield Overview, Pulse of Engagement, Creative Strategy, and AI Vision.
 - **War Room Design**: "Neon Glass" dark cyberpunk aesthetic with deep slate background, neon accents, Inter and JetBrains Mono typography, DEFCON module, Aggression Gauge, Ticker Tape, Mission Control dropdowns with neon glow effects, and a bi-directional Battlefield timeline chart.
-- **Strategic Map (Graph Dashboard)**: Dark Matrix design with dot grid, Executive Strategy View for aggregated ad data, AI Query Bar, Global Filters Sidebar, Node Inspector Panel, Graph Legend, and floating controls. Uses a Neon Intelligence Palette for nodes and weight-based link styling.
+- **Strategic Map (Graph Dashboard)**: Dark Matrix design (#0b0e14) with dot grid pattern, AI Query Bar with "Show me Urgent sentiment topics for Fast Bank" placeholder, Global Filters Sidebar (Timeframe, Brand Source, Connection Strength slider, Sentiment switches, Marketing Tactic pills, Topic Category checkboxes), Node Inspector Panel, Graph Legend at bottom center, and floating zoom controls. Uses Neon Intelligence Palette for nodes (blue brands, purple topics) and weight-based link styling. All visual components match exact Figma specifications.
 
 ### Technical Implementations
 - **Authentication**: Supabase Auth with Google OAuth.
