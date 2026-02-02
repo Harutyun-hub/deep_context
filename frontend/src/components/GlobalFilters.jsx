@@ -2,7 +2,6 @@ import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Checkbox } from './ui/Checkbox';
 import { Switch } from './ui/Switch';
 import { Slider } from './ui/Slider';
-import { useState } from 'react';
 
 const SENTIMENTS = [
   { name: 'Negative', color: 'bg-red-500' },
@@ -20,11 +19,10 @@ export function GlobalFilters({
   isCollapsed,
   onToggleCollapse
 }) {
-  const [showCustomDate, setShowCustomDate] = useState(false);
+  const showCustomDate = filters.selectedTimeframe === 'Custom';
 
   const handleTimeframeClick = (timeframe) => {
     onFilterChange({ ...filters, selectedTimeframe: timeframe });
-    setShowCustomDate(timeframe === 'Custom');
   };
 
   const handleBrandToggle = (brandName) => {

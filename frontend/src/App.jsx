@@ -104,14 +104,37 @@ function App() {
   }, [graphData.links]);
 
   const filteredGraphData = useMemo(() => {
-    if (!graphData.nodes.length) return graphData;
+    if (!graphData.nodes.length) return { nodes: [], links: [] };
 
     const threshold = (filters.connectionThreshold / 100) * maxLinkWeight;
     
-    const filteredLinks = graphData.links.filter(link => {
+    let filteredLinks = graphData.links.filter(link => {
       const weight = link.value || link.weight || 1;
       return weight >= threshold;
     });
+
+    let filteredNodes = [...graphData.nodes];
+    
+    if (filters.selectedBrands.length > 0) {
+      const selectedBrandIds = new Set(
+        graphData.nodes
+          .filter(n => n.group === 'Brand' && filters.selectedBrands.includes(n.label || n.name))
+          .map(n => n.id)
+      );
+      
+      filteredLinks = filteredLinks.filter(link => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        return selectedBrandIds.has(sourceId) || selectedBrandIds.has(targetId);
+      });
+      
+      filteredNodes = filteredNodes.filter(node => {
+        if (node.group === 'Brand') {
+          return selectedBrandIds.has(node.id);
+        }
+        return true;
+      });
+    }
 
     const connectedNodeIds = new Set();
     filteredLinks.forEach(link => {
@@ -121,36 +144,45 @@ function App() {
       connectedNodeIds.add(targetId);
     });
 
-    let filteredNodes = graphData.nodes;
-    
-    if (filters.selectedBrands.length > 0) {
-      const brandNodeIds = new Set(
-        graphData.nodes
-          .filter(n => n.group === 'Brand' && filters.selectedBrands.includes(n.label || n.name))
-          .map(n => n.id)
-      );
-      
-      filteredNodes = filteredNodes.filter(node => {
-        if (node.group === 'Brand') {
-          return brandNodeIds.has(node.id);
-        }
-        return true;
-      });
-    }
-
-    if (filters.connectionThreshold > 0) {
+    if (filters.connectionThreshold > 0 || filters.selectedBrands.length > 0) {
       filteredNodes = filteredNodes.filter(node => connectedNodeIds.has(node.id));
     }
 
+    filteredLinks = filteredLinks.filter(link => {
+      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      const sourceExists = filteredNodes.some(n => n.id === sourceId);
+      const targetExists = filteredNodes.some(n => n.id === targetId);
+      return sourceExists && targetExists;
+    });
+
+    const nodeNeighbors = {};
+    const nodeLinks = {};
+    
+    filteredNodes.forEach(node => {
+      nodeNeighbors[node.id] = new Set();
+      nodeLinks[node.id] = new Set();
+    });
+    
+    filteredLinks.forEach(link => {
+      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      
+      if (nodeNeighbors[sourceId]) nodeNeighbors[sourceId].add(targetId);
+      if (nodeNeighbors[targetId]) nodeNeighbors[targetId].add(sourceId);
+      if (nodeLinks[sourceId]) nodeLinks[sourceId].add(link);
+      if (nodeLinks[targetId]) nodeLinks[targetId].add(link);
+    });
+
+    const nodesWithNeighbors = filteredNodes.map(node => ({
+      ...node,
+      neighbors: nodeNeighbors[node.id] || new Set(),
+      links: nodeLinks[node.id] || new Set()
+    }));
+
     return {
-      nodes: filteredNodes,
-      links: filteredLinks.filter(link => {
-        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-        const sourceExists = filteredNodes.some(n => n.id === sourceId);
-        const targetExists = filteredNodes.some(n => n.id === targetId);
-        return sourceExists && targetExists;
-      })
+      nodes: nodesWithNeighbors,
+      links: filteredLinks
     };
   }, [graphData, filters, maxLinkWeight]);
 
