@@ -136,24 +136,84 @@ function App() {
       });
     }
 
-    const connectedNodeIds = new Set();
-    filteredLinks.forEach(link => {
-      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-      connectedNodeIds.add(sourceId);
-      connectedNodeIds.add(targetId);
-    });
+    // Topic filtering - show selected topics and their connected nodes
+    if (filters.selectedTopics.length > 0) {
+      const selectedTopicIds = new Set(
+        graphData.nodes
+          .filter(n => n.group === 'Topic' && filters.selectedTopics.includes(n.label || n.name))
+          .map(n => n.id)
+      );
+      
+      // Keep links that connect to selected topics
+      filteredLinks = filteredLinks.filter(link => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        return selectedTopicIds.has(sourceId) || selectedTopicIds.has(targetId);
+      });
+      
+      // Find all nodes connected to selected topics
+      const connectedToTopics = new Set();
+      filteredLinks.forEach(link => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        connectedToTopics.add(sourceId);
+        connectedToTopics.add(targetId);
+      });
+      
+      // Keep selected topics and their connected nodes
+      filteredNodes = filteredNodes.filter(node => connectedToTopics.has(node.id));
+    }
 
-    if (filters.connectionThreshold > 0 || filters.selectedBrands.length > 0) {
+    // Sentiment filtering - show nodes matching sentiment or nodes without sentiment property
+    if (filters.selectedSentiments.length > 0) {
+      const nodesToKeep = new Set();
+      
+      filteredNodes.forEach(node => {
+        // Keep nodes with matching sentiment
+        if (node.sentiment && filters.selectedSentiments.includes(node.sentiment)) {
+          nodesToKeep.add(node.id);
+        }
+        // Keep Brand nodes (they don't have sentiment)
+        if (node.group === 'Brand') {
+          nodesToKeep.add(node.id);
+        }
+      });
+      
+      filteredNodes = filteredNodes.filter(node => nodesToKeep.has(node.id));
+      
+      // Prune links to removed nodes
+      const nodeIdSet = new Set(filteredNodes.map(n => n.id));
+      filteredLinks = filteredLinks.filter(link => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        return nodeIdSet.has(sourceId) && nodeIdSet.has(targetId);
+      });
+    }
+
+    // Final pruning: remove nodes with no connections (applies to all active filters)
+    const hasActiveFilters = filters.connectionThreshold > 0 || 
+                             filters.selectedBrands.length > 0 || 
+                             filters.selectedTopics.length > 0 || 
+                             filters.selectedSentiments.length > 0;
+    
+    if (hasActiveFilters) {
+      const connectedNodeIds = new Set();
+      filteredLinks.forEach(link => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        connectedNodeIds.add(sourceId);
+        connectedNodeIds.add(targetId);
+      });
+      
       filteredNodes = filteredNodes.filter(node => connectedNodeIds.has(node.id));
     }
 
+    // Ensure links only connect existing nodes
+    const finalNodeIds = new Set(filteredNodes.map(n => n.id));
     filteredLinks = filteredLinks.filter(link => {
       const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
       const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-      const sourceExists = filteredNodes.some(n => n.id === sourceId);
-      const targetExists = filteredNodes.some(n => n.id === targetId);
-      return sourceExists && targetExists;
+      return finalNodeIds.has(sourceId) && finalNodeIds.has(targetId);
     });
 
     const nodeNeighbors = {};
