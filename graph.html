@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Graph - Deep Context AI</title>
+    <meta name="description" content="Interactive graph visualization showing competitive intelligence relationships.">
+    
+    <link rel="icon" type="image/png" href="attached_assets/Deep_context_logo_rounded_1767425427538.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0b0e14;
+        }
+        .graph-layout {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+        .graph-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0b0e14;
+        }
+        .graph-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .graph-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .graph-header h1 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        .graph-header .subtitle {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.875rem;
+        }
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 8px;
+            color: #a78bfa;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .back-btn:hover {
+            background: rgba(139, 92, 246, 0.3);
+        }
+        .graph-iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+        }
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .mobile-overlay.visible {
+            display: block;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -260px;
+                top: 0;
+                height: 100%;
+                z-index: 1000;
+                transition: left 0.3s ease;
+            }
+            .sidebar.open {
+                left: 0;
+            }
+        }
+    </style>
+</head>
+<body class="dashboard-page">
+    <div class="app-container">
+        <div class="animated-bg">
+            <div class="bg-gradient"></div>
+            <div class="blob blob-1"></div>
+            <div class="blob blob-2"></div>
+            <div class="blob blob-3"></div>
+        </div>
+
+        <div class="main-layout graph-layout">
+            <div class="mobile-overlay" id="mobileOverlay"></div>
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-brand">
+                        <button class="menu-btn" id="menuBtn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor"/>
+                            </svg>
+                        </button>
+                        <span class="brand-text">Deep Context</span>
+                    </div>
+                    <button class="collapse-btn" id="collapseBtn">
+                        <svg class="chevron-left" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/>
+                        </svg>
+                        <svg class="chevron-right" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" fill="currentColor"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="sidebar-actions">
+                    <button class="new-chat-btn" onclick="window.location.href='/index.html'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor"/>
+                        </svg>
+                        <span class="btn-text">New chat</span>
+                    </button>
+                </div>
+                
+                <div class="sidebar-scroll-container">
+                    <nav class="sidebar-nav">
+                        <a href="/index.html" class="nav-item" data-view="chat">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z" fill="currentColor"/>
+                            </svg>
+                            <span class="nav-text">Chat</span>
+                        </a>
+                        <a href="/dashboard.html" class="nav-item" data-view="dashboard">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" fill="currentColor"/>
+                            </svg>
+                            <span class="nav-text">Dashboard</span>
+                        </a>
+                        <a href="/war_room.html" class="nav-item" id="warRoomNavBtn" data-view="warroom">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="currentColor"/>
+                            </svg>
+                            <span class="nav-text">War Room</span>
+                        </a>
+                        <a href="/graph.html" class="nav-item active" data-view="graph">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z" fill="currentColor"/>
+                                <circle cx="9" cy="13" r="2" fill="currentColor"/>
+                                <circle cx="15" cy="11" r="2" fill="currentColor"/>
+                                <circle cx="12" cy="17" r="2" fill="currentColor"/>
+                                <path d="M9 13l3 4M15 11l-3 6M9 13l6-2" stroke="currentColor" stroke-width="1"/>
+                            </svg>
+                            <span class="nav-text">Smart Graph</span>
+                        </a>
+                    </nav>
+                </div>
+                
+                <div class="sidebar-footer">
+                    <button class="settings-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81a.488.488 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" fill="currentColor"/>
+                        </svg>
+                        <span class="btn-text">Settings & help</span>
+                    </button>
+                </div>
+            </aside>
+            
+            <div class="graph-content">
+                <header class="graph-header">
+                    <div class="graph-header-left">
+                        <div>
+                            <h1>Smart Graph</h1>
+                            <p class="subtitle">Interactive Competitive Intelligence Visualization</p>
+                        </div>
+                    </div>
+                    <button class="back-btn" onclick="window.location.href='/index.html'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" fill="currentColor"/>
+                        </svg>
+                        <span>Back to Chat</span>
+                    </button>
+                </header>
+                <iframe 
+                    id="graphFrame" 
+                    class="graph-iframe" 
+                    title="Smart Graph Visualization"
+                    allow="fullscreen"
+                ></iframe>
+            </div>
+        </div>
+    </div>
+    
+    <script src="logger.js"></script>
+    <script src="utils.js"></script>
+    <script src="SupabaseManager.js"></script>
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    <script>
+        (async function() {
+            try {
+                await requireAuth();
+                loadGraph();
+            } catch (error) {
+                console.error('Auth check failed:', error);
+            }
+        })();
+        
+        function loadGraph() {
+            const iframe = document.getElementById('graphFrame');
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            
+            let graphUrl;
+            if (hostname.includes('replit.dev') || hostname.includes('replit.app')) {
+                graphUrl = protocol + '//' + hostname.replace(/^[^.]+/, hostname.split('.')[0].replace(/-00-/, '-01-'));
+            } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                graphUrl = protocol + '//localhost:5000';
+            } else {
+                graphUrl = protocol + '//' + hostname + ':5000';
+            }
+            
+            iframe.src = graphUrl;
+        }
+        
+        const collapseBtn = document.getElementById('collapseBtn');
+        const sidebar = document.getElementById('sidebar');
+        const mobileOverlay = document.getElementById('mobileOverlay');
+        const menuBtn = document.getElementById('menuBtn');
+        
+        if (collapseBtn) {
+            collapseBtn.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+            });
+        }
+        
+        function closeMobileMenu() {
+            sidebar.classList.remove('open');
+            mobileOverlay.classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+        
+        function openMobileMenu() {
+            sidebar.classList.add('open');
+            mobileOverlay.classList.add('visible');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        if (menuBtn) {
+            menuBtn.addEventListener('click', function() {
+                if (sidebar.classList.contains('open')) {
+                    closeMobileMenu();
+                } else {
+                    openMobileMenu();
+                }
+            });
+        }
+        
+        if (mobileOverlay) {
+            mobileOverlay.addEventListener('click', closeMobileMenu);
+        }
+        
+        document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    closeMobileMenu();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
