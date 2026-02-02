@@ -70,7 +70,7 @@ export function GlobalFilters({
       selectedSentiments: [],
       selectedTactics: [],
       selectedTopics: [],
-      connectionThreshold: 50
+      connectionThreshold: 0
     });
   };
 
