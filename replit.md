@@ -1,7 +1,7 @@
 # Deep Context - Modern Chat Interface
 
 ## Overview
-Deep Context is a sleek, modern web-based chat application featuring an Apple-inspired glassmorphism design. It aims to provide a seamless multi-user chat experience with robust authentication, message persistence, and AI integration. A key feature is an analytics dashboard for comprehensive data visualization of ad campaigns across multiple platforms, alongside a "War Room" for tactical competitive intelligence.
+Deep Context is a modern web-based chat application with an Apple-inspired glassmorphism design, providing a multi-user chat experience, robust authentication, message persistence, and AI integration. It also features an analytics dashboard for ad campaign data visualization and a "War Room" for competitive intelligence. The project aims to deliver a seamless, high-performance platform for communication and strategic market analysis.
 
 ## User Preferences
 - Clean, modern, classy interface
@@ -12,68 +12,46 @@ Deep Context is a sleek, modern web-based chat application featuring an Apple-in
 - Generous whitespace and breathing room
 
 ## System Architecture
-The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a glassmorphism aesthetic and robust data handling.
+The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a glassmorphism aesthetic and robust data handling, alongside a React-based interactive graph visualization dashboard.
 
 ### UI/UX Decisions
-- **Glassmorphism Design**: Apple-inspired semi-transparent panels with a 24px backdrop-blur.
-- **Animated Background**: Three floating gradient orbs with smooth 7-second blob animations.
-- **Refined Color Palette**: Light theme with professional blue accents (`#3b82f6`) and gray tones.
-- **Layout**: Collapsible left sidebar for navigation, main chat area with AI Assistant header, message list, and fixed input bar.
-- **Message Display**: Glass bubble messages with avatars; user messages on the right (50% opacity), AI messages on the left (40% opacity).
+- **Glassmorphism Design**: Semi-transparent panels with a 24px backdrop-blur.
+- **Animated Background**: Floating gradient orbs with smooth animations.
+- **Color Palette**: Light theme with blue accents (`#3b82f6`) and gray tones for chat, and a dark, neon cyberpunk aesthetic for the "War Room."
+- **Layout**: Collapsible left sidebar, main chat area with AI Assistant header, message list, and fixed input bar.
+- **Message Display**: Glass bubble messages with avatars, user messages right, AI messages left.
 - **Dashboard Design**: Glass filter section, blue table headers, collapsible content sections.
-- **Competitive Intelligence Suite**: 4-pillar tabbed navigation for Battlefield Overview, Pulse of Engagement, Creative Strategy, and AI Vision (AI Analysis).
-- **War Room Design**: "Neon Glass" dark cyberpunk aesthetic with deep slate background, neon accents, Inter and JetBrains Mono typography, DEFCON module, Aggression Gauge, Ticker Tape, Mission Control dropdowns with neon glow effects, and bi-directional Battlefield timeline chart.
+- **Competitive Intelligence Suite**: 4-pillar tabbed navigation for Battlefield Overview, Pulse of Engagement, Creative Strategy, and AI Vision.
+- **War Room Design**: "Neon Glass" dark cyberpunk aesthetic with deep slate background, neon accents, Inter and JetBrains Mono typography, DEFCON module, Aggression Gauge, Ticker Tape, Mission Control dropdowns with neon glow effects, and a bi-directional Battlefield timeline chart.
+- **Strategic Map (Graph Dashboard)**: Dark Matrix design with dot grid, Executive Strategy View for aggregated ad data, AI Query Bar, Global Filters Sidebar, Node Inspector Panel, Graph Legend, and floating controls. Uses a Neon Intelligence Palette for nodes and weight-based link styling.
 
 ### Technical Implementations
 - **Authentication**: Supabase Auth with Google OAuth.
-- **Database Architecture**: Two-database system utilizing Supabase PostgreSQL for user data, conversations, messages, and analytics (with RLS), and n8n Redis for AI conversation context and memory. Features a central `companies` table for multi-company support.
-- **Company-Based Filtering**: Canonical `company_key` for identifying companies across all data, with logo display and company selectors in UI.
+- **Database Architecture**: Two-database system using Supabase PostgreSQL for user data, conversations, messages, analytics (with RLS), and n8n Redis for AI conversation context and memory. Features a central `companies` table for multi-company support.
+- **Company-Based Filtering**: Canonical `company_key` for data identification and UI selectors.
 - **AI Integration**: n8n webhook endpoint for contextual AI responses based on `sessionId`, `userId`, and `companyKey`.
-- **Smart Rendering System**: Modular `message-renderer.js` supporting rich text (Markdown), Chart.js charts (with series data format support), data tables with auto-column detection and status indicators, media galleries, and dedicated image displays. The `normalizeEnvelope` function handles multiple AI response formats including `images` (with label, url, description fields) and `chart` (with series[].data[] format using category field for labels).
-- **Performance Optimizations**: SupabaseManager singleton, QueryCache for memory/localStorage caching, batched logging, server-side config injection, and debouncing for UI interactions.
-- **Robust Message Saving**: Messages capture conversation/user IDs at send time, background task tracking, and browser `beforeunload` warning.
-- **PendingMessageQueue**: Client-side localStorage-based queue for reliable message persistence. Features include: automatic retry with exponential backoff (up to 5 attempts), 60-second timeout per save, graceful fallback to in-memory queue when localStorage unavailable (Safari private mode), auto-flush on page load/visibility change/network online events. Ensures zero message loss for RAG applications.
-- **Enterprise Chat State Machine**: Manages chat states (IDLE, SENDING, AWAITING_AI, RENDERING, ERROR) for UI sync, prevents duplicate sends, and includes global safety watchdog timeouts.
-- **Delta-Time Typing Animation**: Uses `requestAnimationFrame` with delta-time logic instead of `setInterval` to prevent browser throttling issues when tabs are in background. Automatically detects large time gaps (>500ms) when returning from background tabs and immediately completes animations to prevent UI freezing.
-- **Connection Warm-Up**: `ensureConnectionReady()` function in auth.js that awaits session refresh and runs a lightweight ping query before heavy database operations. Used by `handleVisibilityResume()` to prevent 30-second timeouts when returning from background tabs. Features debouncing to prevent concurrent warm-ups, 3-second timeout with retry logic, and "Reconnecting..." indicator for user feedback.
-- **Connection Recovery System**: Addresses multiple Supabase deadlock bugs. Key fixes: (1) onAuthStateChange callback is now synchronous with setTimeout(..., 0) for async work (GitHub Issue #762), (2) noOpLock bypasses Web Lock API deadlocks (GitHub Issue #1594), (3) detectSessionInUrl: true for OAuth token auto-detection, (4) ensureConnectionReady uses ping-only approach without blocking getSession calls (GitHub Issue #35754), (5) handleVisibilityResume is non-blocking fire-and-forget, (6) SupabaseManager.reinitialize() available for manual recovery.
-- **OAuth State Settlement**: `waitForAuthState()` function waits for `onAuthStateChange` to fire `SIGNED_IN` or `INITIAL_SESSION` events before checking session state, preventing race conditions during OAuth callback. Features 5-second timeout fallback and loading overlay UI ("Signing you in...") during token exchange.
-- **Application Lifecycle Manager**: Ensures strict initialization order (DOM, Auth, Chat) with promise-based execution and global error boundaries.
-- **Standardized Database Layer**: All Supabase operations return `{ success, data, error }` objects for consistent error handling.
+- **Smart Rendering System**: Modular `message-renderer.js` supporting rich text (Markdown), Chart.js charts, data tables, media galleries, and images. `normalizeEnvelope` handles various AI response formats.
+- **Performance Optimizations**: SupabaseManager singleton, QueryCache for caching, batched logging, server-side config injection, and debouncing.
+- **Robust Message Saving**: Messages capture IDs, background task tracking, browser `beforeunload` warning, and a client-side `PendingMessageQueue` (localStorage-based) for reliable message persistence with retry logic and auto-flush.
+- **Enterprise Chat State Machine**: Manages chat states for UI sync, prevents duplicate sends, and includes global safety watchdog timeouts.
+- **Delta-Time Typing Animation**: Uses `requestAnimationFrame` for smooth animations without browser throttling.
+- **Connection Management**: `ensureConnectionReady()` for warm-up and `handleVisibilityResume()` for recovery from background tabs, addressing Supabase deadlock bugs. `waitForAuthState()` prevents OAuth race conditions.
+- **Application Lifecycle Management**: Ensures strict initialization order with promise-based execution and global error boundaries.
+- **Standardized Database Layer**: All Supabase operations return consistent `{ success, data, error }` objects.
 - **Server**: Python HTTP server for `/api/config` to deliver secure credentials.
-- **Multi-Industry Subdomain Routing**: Server-side routing based on Host header subdomain. Main domain (deepcontext.am) uses default config unchanged. Subdomains (igaming.deepcontext.am, finance.deepcontext.am) route to industry-specific Supabase instances and n8n webhooks. Security: Only allows routing for whitelisted domains (deepcontext.am, replit.dev, replit.app). Environment variables per industry: `{INDUSTRY}_SUPABASE_URL`, `{INDUSTRY}_SUPABASE_ANON_KEY`, `{INDUSTRY}_N8N_WEBHOOK`.
-- **Competitive Intelligence Suite**: `dashboard.html` with client-vs-competitor comparison using Supabase queries and Chart.js.
-- **Shared Intelligence Utilities**: `intelligenceUtils.js` provides centralized `calculateThreatLevel()` function used by both Main Dashboard and War Room for consistent threat scoring.
-- **War Room**: `/war_room.html` standalone page with Command Deck (DEFCON + Aggression Gauge from `intel_events` via shared `intelligenceUtils.js`), Mission Control (company selector dropdowns with neon glow), "Stacked Frontline" Battlefield Chart, and Digital Surveillance section. The Battlefield Chart uses a 70/30 layout with 4 stacked datasets: US Paid Ads (neon blue #3B82F6), US Organic (faded blue 30%), THEM Paid Ads (neon red #EF4444), THEM Organic (faded red 30%). Features custom HTML legend showing "PAID OFFENSIVE" and "ORGANIC NOISE" indicators for both sides. Y-axis displays no tick numbers with white frontline at y=0. Intel Feed panel (30% width) shows actual enemy creatives on chart hover. Digital Surveillance includes: (A) Tech Radar - uses `website_data.tech_stack` JSONB column (with JSON.parse() guard for string payloads) with "Ghost Protocol" 3-state badge logic: Active/DETECTED (neon colors for direct flags), Inferred/GTM MANAGED (dotted border, 50% opacity with hover tooltip for pixels hidden in GTM), Inactive/NOT DETECTED (grey/dimmed); also includes "Other Detected Scripts" section showing unknown external script domains as neon pills (filtered from major platforms); (B) Visual Intercept "Time Glider" - horizontal time scrubber using `company_screenshots` table, fetches last 7 screenshots (newest first, reversed to chronological), cyan-glow slider handle with gradient track, date badge overlay, defaults to newest screenshot, updates image and AI analysis on glide; (C) Market Intel - Promotions Tracker using `website_data.active_promotions` JSONB with headline display and "Promo Pill" system: Money/Bonus (💰 green), Free Spins (🎰 purple), Free Bets (🎫 orange), Events/Jackpots (🏆 gold). All sections auto-refresh every 30 seconds. TotoGaming Protocol ensures default selection of company ID `9b67e411-ec00-47d9-87d4-a56dacf41e8a` as the friendly DEFENSE ASSET.
-
-### Feature Specifications
-- **Multi-User/Multi-Company Support**: Private conversation history and data with centralized company management.
-- **Session Management**: UUID session IDs for AI context.
-- **Message Persistence**: Chat history saved in Supabase with RLS.
-- **Rich Content Display**: AI responses support rich text, interactive charts, tables, and media galleries.
-- **Competitive Intelligence Suite**: 4-pillar strategic dashboard for market analysis, engagement trends, creative strategy, and website tracking.
-- **War Room**: Tactical Command Center displaying DEFCON threat levels, aggression gauge, live competitor activity ticker, Mission Control for company vs. competitor selection (TotoGaming Protocol default), and "Stacked Frontline" Battlefield chart showing 30-day marketing activity timeline with 4 datasets (Paid vs Organic for both sides) and Live Intel Feed sidebar displaying actual competitor creatives on hover.
-- **Live Threat Telemetry**: Real-time "COMPETITOR ACTIVITY" badge in header (black glassmorphism design matching login page, absolute center positioned). Uses shared `intelligenceUtils.js` for consistent weighted scoring across all pages. Data sourced from `intel_events` table (last 24 hours) with weighted calculation: HIGH severity = 25 points, MEDIUM = 8 points, LOW = 2 points, default = 5 points. Score capped at 100. UI Thresholds: Score 0-30 = "SECURE" / "Low 🟢" (green), Score 31-70 = "ELEVATED" / "Moderate 👀" (yellow), Score 71-100 = "CRITICAL" / "HIGH 🔥" (red pulse). War Room sidebar button pulses red (critical) or glows yellow (elevated).
-- **AI Vision Analysis**: Visual Intercept section displays AI-analyzed screenshots with "AI Tactical Insight" panel showing marketing intent headline and AI analysis subtext when `promotions_detected=true` or `ai_analysis` exists.
-- **Website AI Analysis Tab**: Glassmorphism-styled screenshot viewer in the Competitive Intelligence Suite. Features: (1) Company dropdown selector to choose competitor, (2) Hero screenshot with glassmorphism frame and gradient borders, (3) Time slider scrubber for scrolling through screenshot history (oldest to newest), (4) AI Insight Panel with marketing intent headline, AI analysis description, promotions detected badge, and visit website link. Uses `company_screenshots` table with `marketing_intent`, `ai_analysis`, and `promotions_detected` columns. CSS includes animated glows, frosted glass effects, and smooth transitions.
-
-- **Strategic Map (Graph Dashboard)**: React-based interactive force-directed graph visualization at `frontend/`. Uses `react-force-graph-2d` to display Neo4j graph data from `/api/graph`. Features:
-  - **Executive Strategy View**: Optimized aggregation query that compresses 2000+ Ad nodes into ~100 node lightweight Brand-Topic strategy map
-  - **Single-Record Aggregation Query**: Backend aggregates ads into weights, limits to top 80 topics by global volume, returns pre-calculated nodes with id/group/label/radius/color
-  - **War Room Card Container**: Professional rounded-2xl card with subtle shadow, glassmorphism header showing entity/connection counts, and inline legend (Brands/Topics)
-  - **Deep Space Blue Canvas (#0f172a)**: Dark background that makes data pop
-  - **Neon Intelligence Palette**: Brands (Neon Blue #3b82f6 with 15px glow, fixed 30px radius), Topics (Neon Purple #a855f7, dynamic radius based on log(market volume))
-  - **Weight-Based Link Styling**: Gray links (#94a3b8) with thickness based on ad volume between brand and topic (sqrt(value)+1 formula)
-  - **Physics Engine**: Strong repulsion (`charge.strength(-400)`) and longer link distance (120px) for readability
-  - **Click-Triggered Side Panel**: Topic nodes show market volume note and connection count. Brand nodes show industry and connection count.
-  - **Interactivity**: Hover highlighting (dims non-connected nodes to 15% opacity, shows tooltip with entity name/type/connections), click-to-zoom (centers and zooms to 2.5x with side panel), background click resets highlights and closes panel
-  - **Tailwind CSS**: Configured with `@tailwindcss/postcss` for styling
+- **Multi-Industry Subdomain Routing**: Server-side routing based on Host header for industry-specific Supabase instances and n8n webhooks.
+- **Competitive Intelligence Suite**: `dashboard.html` for client-vs-competitor analysis using Supabase and Chart.js, and `intelligenceUtils.js` for consistent threat scoring.
+- **War Room Specifics**: Command Deck (DEFCON + Aggression Gauge), Mission Control, "Stacked Frontline" Battlefield Chart (marketing activity timeline with 4 datasets), Live Intel Feed sidebar, Digital Surveillance (Tech Radar, Visual Intercept "Time Glider" with screenshots and AI analysis, Market Intel - Promotions Tracker). Auto-refresh every 30 seconds.
+- **Live Threat Telemetry**: Real-time "COMPETITOR ACTIVITY" badge in header with weighted scoring from `intel_events` table and UI thresholds (SECURE, ELEVATED, CRITICAL).
+- **AI Vision Analysis**: Displays AI-analyzed screenshots with "AI Tactical Insight" panel showing marketing intent and analysis.
+- **Website AI Analysis Tab**: Glassmorphism-styled screenshot viewer in the Competitive Intelligence Suite with company selector, time slider, and AI Insight Panel.
+- **Strategic Map (Graph Dashboard)**: React-based force-directed graph visualization using `react-force-graph-2d`, displaying Neo4j data. Features include: Executive Strategy View with aggregated ad data, AI Query Bar, Global Filters Sidebar, Node Inspector Panel, Graph Legend, and interactive controls (zoom, fit-to-screen). Styling uses Tailwind CSS and Radix UI.
 
 ## External Dependencies
 - **Supabase**: User authentication (Google OAuth), PostgreSQL database, and Row Level Security.
 - **n8n**: AI backend for contextual responses and Redis for AI conversation memory.
-- **Neo4j**: Graph database for relationship data, served via Express API at `/api/graph`.
-- **React + Vite**: Modern React frontend in `frontend/` directory with HMR and API proxy.
-- **react-force-graph-2d**: Force-directed graph visualization library for interactive node-link diagrams.
-- **Chart.js 4.4.1**: Interactive charts for AI responses and the analytics dashboard.
-- **Typography**: Space Grotesk (variable font, locally hosted) for login page; Inter and JetBrains Mono via Google Fonts for other pages.
+- **Neo4j**: Graph database for relationship data (accessed via `/api/graph`).
+- **React + Vite**: Frontend development for the Strategic Map dashboard.
+- **react-force-graph-2d**: Library for graph visualization in the Strategic Map.
+- **Chart.js 4.4.1**: Interactive charts for AI responses and analytics.
+- **Typography**: Space Grotesk (locally hosted), Inter and JetBrains Mono (Google Fonts).
