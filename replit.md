@@ -18,7 +18,7 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Glassmorphism Design**: Semi-transparent panels with a 24px backdrop-blur.
 - **Animated Background**: Floating gradient orbs with smooth animations.
 - **Color Palette**: Light theme with blue accents (`#3b82f6`) and gray tones for chat, and a dark, neon cyberpunk aesthetic for the "War Room."
-- **Layout**: Collapsible left sidebar, main chat area with AI Assistant header, message list, and fixed input bar.
+- **Layout**: Collapsible left sidebar with navigation (Chat, Dashboard, War Room, Smart Graph), main chat area with AI Assistant header, message list, and fixed input bar.
 - **Message Display**: Glass bubble messages with avatars, user messages right, AI messages left.
 - **Dashboard Design**: Glass filter section, blue table headers, collapsible content sections.
 - **Competitive Intelligence Suite**: 4-pillar tabbed navigation for Battlefield Overview, Pulse of Engagement, Creative Strategy, and AI Vision.
@@ -45,7 +45,7 @@ The application is built with vanilla HTML, CSS, and JavaScript, emphasizing a g
 - **Live Threat Telemetry**: Real-time "COMPETITOR ACTIVITY" badge in header with weighted scoring from `intel_events` table and UI thresholds (SECURE, ELEVATED, CRITICAL).
 - **AI Vision Analysis**: Displays AI-analyzed screenshots with "AI Tactical Insight" panel showing marketing intent and analysis.
 - **Website AI Analysis Tab**: Glassmorphism-styled screenshot viewer in the Competitive Intelligence Suite with company selector, time slider, and AI Insight Panel.
-- **Strategic Map (Graph Dashboard)**: React-based force-directed graph visualization using `react-force-graph-2d`, displaying Neo4j data. Features include: Executive Strategy View with aggregated ad data, AI Query Bar, Global Filters Sidebar, Node Inspector Panel, Graph Legend, and interactive controls (zoom, fit-to-screen). Styling uses Tailwind CSS and Radix UI.
+- **Strategic Map (Graph Dashboard)**: React-based force-directed graph visualization using `react-force-graph-2d`, displaying Neo4j data. Features include: Executive Strategy View with aggregated ad data, AI Query Bar, Global Filters Sidebar, Node Inspector Panel, Graph Legend, and interactive controls (zoom, fit-to-screen). Styling uses Tailwind CSS and Radix UI. Accessible via "Smart Graph" navigation in all sidebar menus (index.html, dashboard.html) linking to graph.html.
 
 ## External Dependencies
 - **Supabase**: User authentication (Google OAuth), PostgreSQL database, and Row Level Security.
